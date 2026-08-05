@@ -34,13 +34,16 @@
 │   ├── hn_all.csv                # 원본 KNHANES 데이터 (직접 다운로드 필요)
 │   └── 0325_hn_all(med).csv      # 전처리 완료 데이터 (전처리 스크립트 실행 후 생성)
 │
-├── 01_data_preprocessing.py   # [STEP 1] 원본 데이터 → 분석용 데이터셋 생성
+├── 01_data_processing.py      # [STEP 1] 원본 데이터 → 분석용 데이터셋 생성
 ├── 02_statistical_table.py    # [STEP 2] 기술통계 및 검정통계표 생성 (.xlsx)
 ├── 03_modeling.py             # [STEP 3] 모델 학습, 평가, SHAP 분석 (Google Colab)
 ├── 04_streamlit_app.py        # [STEP 4] 웹 서비스 구현
+├── 05_forest_plot.py          # [STEP 5] 계층적 로지스틱 회귀 OR Forest Plot
 │
 └── README.md
 ```
+
+> ℹ️ `01_data_processing.py` ↔ `03_modeling.py`는 이전 업로드 시 파일명과 내용이 뒤바뀌어 있었습니다. 지금은 파일명 그대로 내용이 일치하도록 정정된 상태입니다 (01=전처리, 03=모델링).
 
 ---
 
@@ -57,7 +60,7 @@ pip install pandas numpy scipy statsmodels scikit-learn xgboost lightgbm catboos
 ### 1단계: 데이터 전처리
 
 ```bash
-python 01_data_preprocessing.py
+python 01_data_processing.py
 ```
 
 - 20–39세 필터링, 약물 복용군 포함(약물 보정 방식)
@@ -92,6 +95,15 @@ Google Colab → 공유 드라이브 경로 설정 → 전체 실행
 streamlit run 04_streamlit_app.py
 ```
 
+### 5단계: Forest Plot 생성 (선택)
+
+```bash
+python 05_forest_plot.py
+```
+
+- 3단계 계층적 로지스틱 회귀(Model 1→2→3) 각 변수의 OR을 Forest Plot으로 시각화
+- Model 3 전체 변수 Forest Plot, 모델별 적합도 변화 + 운동 그룹 OR, 성별 층화 비교 등 3종 차트 생성
+
 ---
 
 ## 🔬 핵심 방법론
@@ -114,6 +126,8 @@ streamlit run 04_streamlit_app.py
 | Model 3 | + 운동그룹 | < 0.0001 |
 
 운동 그룹의 독립 효과(OR 0.36, p<0.001) 통계적으로 입증 → 핵심 예측 변수로 확정
+
+> 📈 위 3단계 모델의 변수별 OR은 `05_forest_plot.py`로 Forest Plot 시각화하여 확인할 수 있습니다.
 
 ### 최종 모델 성능
 
