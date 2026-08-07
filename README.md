@@ -26,8 +26,8 @@
 | 데이터 | 국민건강영양조사(KNHANES) 제9기 (2022–2024) |
 | 분석 대상 | 20–39세 청년층 3,363명 |
 | 개발 기간 | 2026.04 (약 1개월), 6인 팀 |
-| 통계 분석 | 복합표본(weight+strata+PSU) 로지스틱 회귀 |
-| ML 모델 | RandomForest + Isotonic Calibration |
+| 통계 분석 | KNHANES 표본설계를 반영한 로지스틱 회귀 |
+| ML 모델 | RandomForest (예측확률 보정 적용) |
 | Test ROC-AUC | 0.7122 |
 | Test Recall | 0.654 |
 | 서비스 | Streamlit |
@@ -42,8 +42,8 @@
 
 - KNHANES 원시데이터 전처리 및 분석용 변수 생성
 - 대사증후군 5개 구성요소와 약물 복용 보정 기준을 데이터 로직으로 구현
-- 가중 기술통계 및 탐색적 검정 (`02_statistical_table.py`)
-- 3단계 계층적 Logistic Regression, Adjusted OR·95% CI 산출, Forest Plot 시각화 (`05_forest_plot.py`)
+- 표본 가중치를 반영한 기술통계 및 그룹 비교 (`02_statistical_table.py`)
+- 3단계 계층적 Logistic Regression, 보정 오즈비(Adjusted OR) 및 95% CI 산출, Forest Plot 시각화 (`05_forest_plot.py`)
 
 > ML 모델링(`03_modeling.py`)과 최초 Streamlit 구현(`04_streamlit_app.py`)은 팀 내 TA 담당자 2인이 각각 수행했습니다.
 
@@ -114,13 +114,12 @@
 
 | 지표 | 값 |
 |---|---:|
-| ROC-AUC | **0.7122** |
-| Survey-weighted ROC-AUC | 0.7281 |
-| Recall | 0.654 (threshold=0.114) |
-| F1 | 0.2812 |
-| Brier Score | 0.0994 |
+| ROC-AUC (구분 성능) | **0.7122** |
+| Recall (위험군 탐지율) | 0.654 |
+| F1 (Precision·Recall 균형) | 0.2812 |
+| Brier Score (확률 예측 오차) | 0.0994 |
 
-> 기존 프로젝트 결과보다 일부 성능은 낮아졌지만, 데이터 누수를 방지하고 test set을 최종 평가에만 사용해 더 신뢰할 수 있는 평가 구조로 다시 측정한 결과입니다. 자세한 배경은 아래 "🔧 ML 파이프라인 리팩터링" 참고.
+> 기존 프로젝트 결과보다 일부 성능은 낮아졌지만, 데이터 누수를 방지하고 test set을 최종 평가에만 사용해 더 신뢰할 수 있는 평가 구조로 다시 측정한 결과입니다. 자세한 배경은 아래 "🔧 ML 파이프라인 리팩터링" 참고. (참고: KNHANES 표본가중치를 반영한 Survey-weighted ROC-AUC는 0.7281로 비슷한 수준입니다.)
 
 ---
 
@@ -176,7 +175,7 @@ RandomForest 모델 (건강검진 수치는 사용하지 않음)
 - Model 2: + 흡연 + 음주
 - Model 3: + 운동그룹
 
-프로젝트 종료 후 R `survey` 패키지를 이용해 KNHANES의 **가중치(weight), 층화(strata), 집락(PSU)**을 모두 반영해 재분석했습니다. 전체 KNHANES 원표본(전 연령, 20,191명)으로 survey design을 먼저 정의한 뒤, 20–39세 분석대상(3,363명)을 subpopulation으로 `subset()` 지정해 분석했습니다 — 20–39세만 먼저 잘라서 design을 만들면 그 하위표본에 없는 strata/PSU의 설계 정보가 사라져 분산추정이 편향될 수 있어, survey 패키지가 공식적으로 권장하는 방식입니다. 운동그룹 전체 효과는 일반 LRT 대신 **survey design을 고려한 Wald test**로 확인했습니다.
+프로젝트 종료 후 KNHANES의 **가중치·층화·집락 구조를 모두 반영**해 분석을 다시 수행했습니다. 전체 조사표본에서 표본설계를 먼저 정의한 뒤 20–39세를 분석 대상으로 지정했고, 운동그룹 전체의 연관성은 복합표본 설계에 맞는 **Wald test**로 확인했습니다.
 
 <details>
 <summary>기술 상세 보기</summary>
