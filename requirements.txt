@@ -1,16 +1,20 @@
-pandas
-numpy
-scipy
-statsmodels
-scikit-learn
-xgboost
-lightgbm
-catboost
-imbalanced-learn
+# joblib로 배포되는 metabolic_risk_model.joblib을 실제로 학습·저장할 때 쓴
+# 버전으로 고정 (04_streamlit_app.py가 이 버전들로 pickle된 모델을 로드함).
+pandas==2.3.3
+numpy==2.2.6
+scipy==1.15.3
+scikit-learn==1.7.2
+imbalanced-learn==0.14.2
+joblib==1.5.3
+xgboost==3.2.0
+lightgbm==4.7.0
+catboost==1.2.10
+statsmodels==0.14.6
+matplotlib==3.10.9
+streamlit==1.61.1
+plotly==6.9.0
+streamlit-option-menu==0.4.0
+
+# 버전 미검증 (03_modeling.py의 SHAP 분석 등 Colab 환경 전용, 로컬에서 실행하지 않음)
 shap
-matplotlib
 seaborn
-streamlit
-plotly
-streamlit-option-menu
-joblib

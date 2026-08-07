@@ -26,9 +26,7 @@ FIGMA_SUBTEXT = '#555555'
 COLOR_BLUE = '#4A90E2'
 COLOR_CORAL = '#FFA8A8'
 
-COLOR_SAFE = '#27AE60'
 COLOR_WARN = '#F39C12'
-COLOR_DANGER = '#E74C3C'
 
 @st.cache_data
 def load_data():
@@ -61,7 +59,9 @@ df = load_data()
 # 앱에서 재학습하지 않으므로, README에 보고한 성능 지표와 실제 서비스 모델이 항상 같다.
 # 파이프라인이 raw 컬럼(age, sex, smoking_status, drinking_status, exercise_group)을
 # 그대로 받으므로 앱에서 별도로 원-핫 인코딩할 필요가 없다.
-MODEL_THRESHOLD = 0.1143  # 06_model_refactor.py에서 산출한 Youden's J 기준 threshold (참고용)
+# (참고) 모델 평가용 threshold=0.1143(Youden's J)은 여기서 분류에 쓰지 않는다.
+# 앱은 연속 확률만 보여주고, threshold는 06_model_refactor.py의 Recall/F1
+# 평가 목적으로만 존재한다.
 
 @st.cache_resource
 def load_ml_engine():
@@ -212,7 +212,7 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
 
         with col_clinical:
             st.markdown("<h5 style='color:#333; margin-bottom:18px;'>🩸 임상 정보 (선택)</h5>", unsafe_allow_html=True)
-            st.caption("※ 모를 경우 0 유지 (정밀 예측을 위해 입력을 권장합니다)")
+            st.caption("대사증후군 임상 기준 확인을 위해, 건강검진 결과가 있다면 입력해주세요. (모를 경우 0 유지)")
             u_waist = st.number_input("📏 허리둘레 (cm)", min_value=0.0, value=0.0)
 
             # 혈압 입력 (수축기/이완기 나란히 배치)
@@ -300,11 +300,13 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
             col_ml, col_clinical = st.columns([1, 1.2], gap="large")
 
             # ── ML 스크리닝 결과 (항상 표시) ──
+            # 20%/50% 같은 색상 구간을 두지 않는다 — 이 값들은 임상적으로 검증된
+            # 저/중/고위험 cut-off가 아니라 무근거 판단 기준을 암시하게 됨. 게이지는
+            # 단일 색으로 확률만 보여준다 (모델 평가용 threshold=0.1143도 여기서는
+            # 쓰지 않음 — 06_model_refactor.py의 Recall/F1 평가 목적으로만 존재).
             with col_ml:
                 st.markdown("<h5>🤖 생활습관 기반 ML 스크리닝</h5>", unsafe_allow_html=True)
-                if ai_pred_prob < 20: gauge_color = COLOR_SAFE
-                elif ai_pred_prob < 50: gauge_color = COLOR_WARN
-                else: gauge_color = COLOR_DANGER
+                gauge_color = COLOR_BLUE
 
                 fig_gauge = go.Figure(go.Indicator(
                     mode="gauge+number",
@@ -315,16 +317,11 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
                         'bar': {'color': gauge_color},
                         'bgcolor': "#F0F2F6",
                         'borderwidth': 0,
-                        'steps': [
-                            {'range': [0, 20], 'color': "rgba(39, 174, 96, 0.08)"},
-                            {'range': [20, 50], 'color': "rgba(243, 156, 18, 0.08)"},
-                            {'range': [50, 100], 'color': "rgba(231, 76, 60, 0.08)"}
-                        ]
                     }
                 ))
                 fig_gauge.update_layout(height=250, margin=dict(l=25, r=25, t=15, b=15), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color=FIGMA_TEXT, family="Helvetica Neue, sans-serif"))
                 st.plotly_chart(fig_gauge, use_container_width=True)
-                st.caption("나이·성별·흡연·음주·운동 습관만으로 계산한 통계적 예측 확률입니다. 건강검진 수치와는 별개의 결과입니다.")
+                st.caption("생활습관 5개 변수를 기반으로 산출한 통계적 예측 확률이며, 임상적 진단 확률이나 진단 기준을 의미하지 않습니다.")
 
             # ── 임상 기준 판정 결과 (검진 정보 입력량에 따라 분기) ──
             with col_clinical:
