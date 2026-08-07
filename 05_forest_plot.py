@@ -195,6 +195,8 @@ print("✅ [차트 1] 저장 완료: forest_plot_1_model3_exercise_last.png")
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
 # --- 좌측: 모델 적합도 변화 (AIC) ---
+# NOTE: Raw KNHANES survey weights used as freq_weights inflate
+# likelihood-based metrics; AIC is therefore not interpreted.
 ax = axes[0]
 model_names = ['Model 1\n(성별,연령)', 'Model 2\n(+흡연,음주)', 'Model 3\n(+운동)']
 aics = [mod_m1.aic, mod_m2.aic, mod_m3.aic]

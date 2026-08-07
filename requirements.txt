@@ -1,0 +1,15 @@
+pandas
+numpy
+scipy
+statsmodels
+scikit-learn
+xgboost
+lightgbm
+catboost
+imbalanced-learn
+shap
+matplotlib
+seaborn
+streamlit
+plotly
+streamlit-option-menu

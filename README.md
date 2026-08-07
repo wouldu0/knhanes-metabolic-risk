@@ -1,6 +1,6 @@
-# 🩺 AI 기반 청년층(MZ세대) 대사증후군 위험 예측 모델
+# 🩺 KNHANES 기반 청년층 대사증후군 위험 분석 및 예측
 
-> **국민건강영양조사(KNHANES) 기반 20–39세 청년층의 대사증후군 위험을 조기에 식별하는 머신러닝 예측 모델**
+> **국민건강영양조사(KNHANES) 기반 20–39세 청년층의 생활습관 및 임상 데이터를 분석하고 대사증후군 위험을 예측한 헬스케어 데이터 프로젝트**
 
 ---
 
@@ -20,7 +20,7 @@
 | 데이터 출처 | 국민건강영양조사(KNHANES) 제9기 (2022–2024) |
 | 분석 대상 | 20–39세 청년층 N=3,363명 |
 | 학습 데이터 | SMOTE 증강 후 N=4,728명 |
-| 검증 데이터 | N=673명 (독립 검증셋) |
+| 테스트 데이터 | N=673명 (학습 데이터와 분리된 20% hold-out set) |
 | 최종 모델 | Tuned Logistic Regression + Isotonic Calibration |
 | 성능 (Test) | ROC-AUC 0.7347 · Recall 0.6923 · F1 0.3285 |
 
@@ -53,7 +53,8 @@
 ├── 04_streamlit_app.py        # [STEP 4] 웹 서비스 구현
 ├── 05_forest_plot.py          # [STEP 5] 계층적 로지스틱 회귀 OR Forest Plot
 │
-├── results/                   # README에 삽입된 결과 차트 (EDA, 모델 비교)
+├── results/                   # README에 삽입된 결과 차트 (EDA, 모델 비교, Forest Plot)
+├── requirements.txt
 └── README.md
 ```
 
@@ -66,7 +67,7 @@
 KNHANES 원본 데이터는 [질병관리청 국민건강영양조사](https://knhanes.kdca.go.kr) 에서 직접 다운로드 후 `data/` 폴더에 위치시켜야 합니다.
 
 ```bash
-pip install pandas numpy scipy statsmodels scikit-learn xgboost lightgbm catboost imbalanced-learn shap matplotlib seaborn streamlit plotly streamlit-option-menu
+pip install -r requirements.txt
 ```
 
 ### 1단계: 데이터 전처리
@@ -129,11 +130,7 @@ python 05_forest_plot.py
 - **대사증후군 진단 기준**: 대한비만학회 NCEP-ATP III 기준 (5개 구성요소 중 3개 이상)
   - 복부비만(허리둘레), 고중성지방혈증, 저HDL콜레스테롤, 고혈압, 고공복혈당
 - **약물 보정**: 고혈압·이상지질혈증·당뇨 약복용자를 해당 구성요소 '이상'으로 판정
-- **클래스 불균형 보정**: 학습 데이터에 SMOTE 적용 (0:1 비율 1:1 균등화)
-
-> 아래는 튜닝 전 5개 모델의 SMOTE 적용 전/후 성능 비교입니다 (Recall이 전반적으로 상승, 최종 모델 선정 시 Recall을 우선한 근거).
-
-![SMOTE 적용 전/후 성능 비교](results/ml_smote_performance.png)
+- **클래스 불균형 보정**: 학습 데이터에 SMOTE 적용 (0:1 비율 1:1 균등화, 적용 후 5개 모델 전반에서 Recall 상승 확인 → 최종 모델 선정 시 Recall 우선 기준의 근거)
 
 ### 모델 선정 근거
 
@@ -145,19 +142,22 @@ python 05_forest_plot.py
 | Model 2 | + 흡연, 음주 | 0.0001 |
 | Model 3 | + 운동그룹 | < 0.0001 |
 
-운동 그룹의 독립 효과(OR 0.36, p<0.001) 통계적으로 입증 → 핵심 예측 변수로 확정
+운동 그룹의 독립적 연관성 확인 → 핵심 예측 변수로 확정
 
-> 📈 위 3단계 모델의 변수별 OR은 `05_forest_plot.py`로 Forest Plot 시각화하여 확인할 수 있습니다.
+`05_forest_plot.py`에서는 동일한 3단계 구조를 KNHANES 표본가중치(`freq_weights`)와 PSU 단위 cluster-robust 표준오차로 재추정해 OR을 확인합니다. 다른 변수를 보정한 상태에서 복합운동군의 대사증후군 odds는 운동을 하지 않는 군 대비 약 60% 낮게 나타났습니다(OR 0.40, 95% CI 0.28–0.57, p<0.001). 관찰연구 기반 분석이므로 인과관계로 해석하지 않았습니다.
+
+> ⚠️ 표본가중치 적용과 PSU cluster-robust covariance는 반영했지만, 층화(`kstrata`)까지 포함하는 완전한 survey-design 분석은 아닙니다. `02_statistical_table.py`의 가중 t-검정·카이제곱 검정 역시 같은 이유로 탐색적 검정으로 해석했습니다.
+
+![Model 3 전체 변수 Forest Plot](results/forest_plot_1_model3_exercise_last.png)
 
 ### 최종 모델 성능
 
 | 구분 | 값 |
 |------|----|
-| ROC-AUC (Unweighted) | 0.7345 |
-| ROC-AUC (Weighted, 복합표본 반영) | 0.7323 |
-| AUC 편차 | 0.0022 (< 0.02 기준 충족) |
+| ROC-AUC | 0.7345 |
+| Survey-weighted ROC-AUC | 0.7323 |
 | Recall | 0.6923 |
-| F1 Score | 0.3285 |
+| F1 | 0.3285 |
 
 > 아래는 하이퍼파라미터 튜닝 이전, 5개 후보 모델의 ROC/PR 곡선 비교입니다. 로지스틱 회귀가 이 단계에서도 가장 우수해 최종 모델로 선정 후 튜닝을 진행했습니다.
 
@@ -169,11 +169,10 @@ python 05_forest_plot.py
 
 - **성별·연령**: 5개 모델 공통 1순위 예측 변수 (SHAP 일관)
 - **운동 효과**: 복합운동(유산소+근력) 그룹 유병률 8.3% vs 미실천 그룹 16.4% (약 2배 차이)
-- **흡연**: 현재흡연 OR 1.80 (+79.9% 위험 증가, p<0.001)
+- **흡연**: 현재흡연 OR 1.80 (비흡연 대비 odds 약 79.9% 높음, p<0.001)
 - **음주**: p=0.289로 유의하지 않음 (J-curve 현상 및 금주자 편향 영향)
 
-![성별 x 운동 그룹별 대사증후군 유병률](results/chart3_gender_exercise_prevalence.png)
-![대사증후군 5대 구성요소 이상 비율](results/chart5_ms_components.png)
+![운동 그룹별 대사증후군 유병률](results/chart2_exercise_group_prevalence.png)
 
 ---
 
@@ -193,6 +192,8 @@ AI 예측 위험도 + 임상 기준 위험 요인 병합
 
 - 임상 정보 미입력 시: ML 모델 예측 확률만 표시
 - 임상 기준 위험 요인 3개 이상 해당 시: 무조건 100%(확진 수준) 표시
+
+![AI 종합 진단 리포트 화면](results/app_screenshot_diagnosis.png)
 
 ---
 
@@ -214,22 +215,18 @@ AI 예측 위험도 + 임상 기준 위험 요인 병합
 
 **결정**: 연속형 변수는 상·하위 1% 윈저화, 음주는 '월 1회 이상 현재 음주 여부'로 이분화하는 방식으로 정착했습니다(`01_data_processing.py` STEP 4-3, STEP 5).
 
-### 3) 파일명-내용 뒤바뀜
-
-`01_data_processing.py` ↔ `03_modeling.py`는 이전 업로드 시 파일명과 내용이 뒤바뀌어 있었습니다. 지금은 파일명 그대로 내용이 일치하도록 정정된 상태입니다 (01=전처리, 03=모델링).
-
 ---
 
-## 💡 배운 점
+## 💡 프로젝트 경험
 
-**복합표본 통계 설계 이해와 적용**
-KNHANES는 단순 무작위 표본이 아니라 가중치·층화·집락을 반영한 복합표본 조사입니다. 이를 무시하고 단순 평균·빈도로 분석하면 모집단 대표성이 왜곡됩니다. 가중치 정규화(`w_norm`), `DescrStatsW` 기반 가중 t-검정/카이제곱 검정, `GLM(Binomial)` + `var_weights`/`cov_type='cluster'`를 직접 구현하면서 공중보건 데이터 특유의 표본 설계를 반영하는 통계 분석 역량을 익혔습니다.
+**임상 기준의 데이터 로직 전환**
+NCEP-ATP III 대사증후군 진단 기준과 약물 복용 여부를 판정 규칙(`ms_wc`, `ms_tg`, `ms_hdl`, `ms_bp`, `ms_glu`)으로 코드화하여, 임상 지식을 분석 가능한 파생변수로 변환했습니다.
 
-**임상 진단 기준의 코드화**
-간호학 배경을 살려 NCEP-ATP III 대사증후군 진단 기준과 약물 보정 로직을 직접 전처리 코드로 옮겼습니다. 임상 진단 기준을 판정 규칙(`ms_wc`, `ms_tg`, `ms_hdl`, `ms_bp`, `ms_glu`)으로 정확히 구현하는 과정에서, 도메인 지식과 데이터 처리 로직을 연결하는 역할을 경험했습니다.
+**KNHANES 가중 분석 설계**
+국민건강영양조사의 표본 가중치를 기술통계(`DescrStatsW` 가중 t-검정) 및 카이제곱 검정에 적용하고, 로지스틱 회귀에는 `freq_weights`와 PSU 단위 cluster-robust covariance(`cov_type='cluster'`)를 적용했습니다. 다만 층화(`kstrata`)까지 포함하는 완전한 survey-design 분석은 아니라는 점을 인지하고, 검정 결과를 탐색적 수준으로 해석했습니다.
 
-**가설 검증 기반 변수 선정 논리 구축**
-머신러닝 모델링에 앞서, 운동 그룹 변수가 실제로 독립적인 설명력을 가지는지 3단계 계층적 로지스틱 회귀(Model 1→2→3)와 LRT(우도비 검정)로 먼저 검증했습니다. `05_forest_plot.py`로 Model 3의 변수별 OR을 Forest Plot으로 시각화해 통계적 근거를 가진 핵심 예측 변수를 팀에 제시했고, 이 과정에서 '통계적으로 유의한 변수를 먼저 확정한 뒤 머신러닝으로 넘기는' 분석 설계 순서를 익혔습니다.
+**가설 검증을 통한 변수 효과 분석**
+연령·성별 → 흡연·음주 → 운동그룹을 순차적으로 추가하는 3단계 계층적 로지스틱 회귀로 모델 적합도 변화와 OR을 비교하고, Forest Plot으로 시각화해 통계적 근거를 가진 핵심 예측 변수를 팀에 제시했습니다.
 
 ---
 
