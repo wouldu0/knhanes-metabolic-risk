@@ -385,6 +385,7 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
 elif selected == "📊 데이터 인사이트": # 메뉴 이름 수정 반영
     st.markdown("### 📊 청년층 건강 데이터 인사이트")
     st.caption("국민건강영양조사 데이터를 기반으로 한 2030세대 통계입니다.")
+    st.caption("※ 아래 유병률은 분석 표본의 비가중 단순 집계입니다.")
     st.markdown("<br>", unsafe_allow_html=True)
 
     overall_rate = df['metabolic_syndrome'].mean() * 100
@@ -396,11 +397,11 @@ elif selected == "📊 데이터 인사이트": # 메뉴 이름 수정 반영
     with kpi1:
         with st.container(border=True): st.metric(label="총 분석 표본", value=f"{len(df):,}명", delta="20~39세")
     with kpi2:
-        with st.container(border=True): st.metric(label="전체 평균 유병률", value=f"{overall_rate:.1f}%", delta="(비가중)", delta_color="off")
+        with st.container(border=True): st.metric(label="전체 평균 유병률", value=f"{overall_rate:.1f}%")
     with kpi3:
         with st.container(border=True): st.metric(label="남성 유병률", value=f"{male_rate:.1f}%", delta=f"여성의 약 {male_rate / female_rate:.1f}배", delta_color="inverse")
     with kpi4:
-        with st.container(border=True): st.metric(label="운동 안하는 그룹 유병률", value=f"{none_rate:.1f}%", delta="(비가중)", delta_color="off")
+        with st.container(border=True): st.metric(label="운동 안하는 그룹 유병률", value=f"{none_rate:.1f}%")
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 1번째 줄 ---
@@ -451,7 +452,7 @@ elif selected == "📊 데이터 인사이트": # 메뉴 이름 수정 반영
 
     # --- 3번째 줄 ---
     with st.container(border=True):
-        st.markdown("#### 🏋️ 운동 습관과 대사증후군 상관관계")
+        st.markdown("#### 🏋️ 운동 습관별 대사증후군 유병률 (비가중)")
         ex_order = ['복합(유산소+근력)', '근력운동만', '유산소운동만', '운동 안 함']
         ex_rates_df = pd.DataFrame([{'운동 그룹': label, '유병률': df[df['ex_label'] == label]['metabolic_syndrome'].mean() * 100} for label in ex_order if label in df['ex_label'].unique()])
         fig_ex = px.bar(ex_rates_df, x='운동 그룹', y='유병률', color='운동 그룹',
