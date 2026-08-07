@@ -6,7 +6,7 @@
 
 ## 🎬 시연 영상
 
-[![시연 영상](https://img.youtube.com/vi/XTdkpUgz3Tk/maxresdefault.jpg)]((https://youtu.be/XTdkpUgz3Tk))
+[![시연 영상](https://img.youtube.com/vi/XTdkpUgz3Tk/maxresdefault.jpg)](https://youtu.be/XTdkpUgz3Tk)
 
 ---
 
