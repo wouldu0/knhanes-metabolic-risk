@@ -112,7 +112,7 @@
 | XGBoost | 0.7661 |
 | LightGBM | 0.7647 |
 
-상위 모델 간 성능 차이는 사실상 오차범위 안이었지만, 사전에 정한 **CV ROC-AUC 1위 모델을 선택하는 기준**에 따라 RandomForest를 최종 모델로 선정했습니다.
+상위 모델 간 CV ROC-AUC 차이는 매우 작았지만, 사전에 정한 **CV ROC-AUC 1위 기준**에 따라 RandomForest를 최종 모델로 선정했습니다.
 
 ### 최종 Test 성능
 
@@ -403,7 +403,7 @@ full.merge(sub, on="ID", how="left").to_csv("data/hn_all_full_merged.csv", index
 - 단면조사 자료이므로 변수 간 연관성은 확인할 수 있지만 인과관계는 판단할 수 없음
 - 생활습관 기반 ML 모델이라 임상 검사값을 직접 사용한 예측모델보다 정보가 제한적임
 - 동일 KNHANES 표본 내 hold-out 평가이며, 외부 데이터셋 검증은 수행하지 않음
-- 5개 후보 모델의 CV ROC-AUC가 상위 3개(RandomForest·CatBoost·Logistic) 모두 0.77 안팎으로 사실상 오차범위 내 차이 — 다른 시드/분할에서는 순위가 바뀔 수 있음
+- 5개 후보 모델의 CV ROC-AUC가 상위 3개(RandomForest·CatBoost·Logistic) 모두 0.77 안팎으로 성능 차이가 매우 작아 다른 시드/분할에서는 순위가 바뀔 수 있음
 - 최종 모델이 RandomForest라 회귀계수 기반 해석은 어려움 (변수 간 연관성 해석은 위 통계 분석·Forest Plot이 별도로 담당)
 - 식단·수면·실시간 활동량 등 데이터는 모델에 포함하지 않음
 
