@@ -16,7 +16,6 @@ import seaborn as sns
 import statsmodels.api as sm
 import scipy.stats as stats
 import shap
-import joblib
 
 from IPython.display import display
 from scipy.stats import loguniform
@@ -87,7 +86,7 @@ if not os.path.exists('/content/drive'):
 
 def load_and_setup_data():
     """구글 드라이브 공유 드라이브 경로에서 CSV 데이터 로드"""
-    base_path = '/content/drive/Shareddrives/세미1 4조 공유드라이브/TA/신나은/data/'
+    base_path = '/content/drive/Shareddrives/세미1 4조 공유드라이브/TA/[팀원 폴더명]/data/'
     df_smote = pd.read_csv(base_path + 'SMOTE_Train_Data.csv')
     df_orig  = pd.read_csv(base_path + 'Original_Train_Data.csv')
     df_test  = pd.read_csv(base_path + 'Test_Data.csv')
@@ -322,7 +321,7 @@ logistic_total_results = run_3step_logistic_total(df_orig)
 # [Task 3] 데이터 분할 및 SMOTE 적용
 # ===========================================================================
 
-ORIG_PATH = '/content/drive/Shareddrives/세미1 4조 공유드라이브/TA/신나은/data/Original_Train_Data.csv'
+ORIG_PATH = '/content/drive/Shareddrives/세미1 4조 공유드라이브/TA/[팀원 폴더명]/data/Original_Train_Data.csv'
 orig_df = pd.read_csv(ORIG_PATH)
 
 target_candidates = [c for c in orig_df.columns if 'metabolic' in c.lower()]

@@ -387,15 +387,21 @@ elif selected == "📊 데이터 인사이트": # 메뉴 이름 수정 반영
     st.caption("국민건강영양조사 데이터를 기반으로 한 2030세대 통계입니다.")
     st.markdown("<br>", unsafe_allow_html=True)
 
+    overall_rate = df['metabolic_syndrome'].mean() * 100
+    male_rate = df[df['male'] == 1]['metabolic_syndrome'].mean() * 100
+    female_rate = df[df['male'] == 0]['metabolic_syndrome'].mean() * 100
+    none_rate = df[df['ex_label'] == '운동 안 함']['metabolic_syndrome'].mean() * 100
+    combo_rate = df[df['ex_label'] == '복합(유산소+근력)']['metabolic_syndrome'].mean() * 100
+
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     with kpi1:
         with st.container(border=True): st.metric(label="총 분석 표본", value=f"{len(df):,}명", delta="20~39세")
     with kpi2:
-        with st.container(border=True): st.metric(label="전체 평균 유병률", value="12.4%", delta="위험", delta_color="inverse")
+        with st.container(border=True): st.metric(label="전체 평균 유병률", value=f"{overall_rate:.1f}%", delta="위험", delta_color="inverse")
     with kpi3:
-        with st.container(border=True): st.metric(label="남성 유병률", value="17.2%", delta="여성의 약 3배", delta_color="inverse")
+        with st.container(border=True): st.metric(label="남성 유병률", value=f"{male_rate:.1f}%", delta=f"여성의 약 {male_rate / female_rate:.1f}배", delta_color="inverse")
     with kpi4:
-        with st.container(border=True): st.metric(label="운동 안하는 그룹 위험", value="19.8%", delta="복합운동 대비 2배↑", delta_color="inverse")
+        with st.container(border=True): st.metric(label="운동 안하는 그룹 위험", value=f"{none_rate:.1f}%", delta=f"복합운동 대비 {none_rate / combo_rate:.1f}배↑", delta_color="inverse")
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 1번째 줄 ---

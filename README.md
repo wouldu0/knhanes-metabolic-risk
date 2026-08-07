@@ -26,6 +26,17 @@
 
 ---
 
+## 👥 팀 구성 및 담당 역할
+
+| 항목 | 내용 |
+|------|------|
+| 개발 기간 | 2026.04 (약 1개월) |
+| 팀 구성 | 6인 팀 — 데이터 분석(DA) 2인, 기술 구현(TA) 2인이 실무 담당 |
+| 담당 역할 (본인) | **DA** — 데이터 전처리(`01_data_processing.py`), 검정통계표 작성(`02_statistical_table.py`), 3단계 계층적 로지스틱 회귀 및 Forest Plot(OR) 분석(`05_forest_plot.py`)을 단독 수행 |
+| 그 외 역할 | ML 모델링(`03_modeling.py`)과 Streamlit 웹 구현(`04_streamlit_app.py`)은 TA 팀원이 각 1인씩 담당 |
+
+---
+
 ## 🗂️ 프로젝트 구조
 
 ```
@@ -43,8 +54,6 @@
 └── README.md
 ```
 
-> ℹ️ `01_data_processing.py` ↔ `03_modeling.py`는 이전 업로드 시 파일명과 내용이 뒤바뀌어 있었습니다. 지금은 파일명 그대로 내용이 일치하도록 정정된 상태입니다 (01=전처리, 03=모델링).
-
 ---
 
 ## ⚙️ 실행 방법
@@ -54,7 +63,7 @@
 KNHANES 원본 데이터는 [질병관리청 국민건강영양조사](https://knhanes.kdca.go.kr) 에서 직접 다운로드 후 `data/` 폴더에 위치시켜야 합니다.
 
 ```bash
-pip install pandas numpy scipy statsmodels scikit-learn xgboost lightgbm catboost imbalanced-learn shap streamlit plotly streamlit-option-menu
+pip install pandas numpy scipy statsmodels scikit-learn xgboost lightgbm catboost imbalanced-learn shap matplotlib seaborn streamlit plotly streamlit-option-menu
 ```
 
 ### 1단계: 데이터 전처리
@@ -86,6 +95,8 @@ python 02_statistical_table.py
 Google Colab → 공유 드라이브 경로 설정 → 전체 실행
 ```
 
+> ⚠️ 파일 상단 `load_and_setup_data()`의 `base_path`와 `ORIG_PATH`는 팀 공유 드라이브 경로로 되어 있습니다. 본인 환경의 경로로 수정한 뒤 실행하세요.
+
 학습되는 모델: Logistic / RandomForest / XGBoost / LightGBM / CatBoost  
 평가 지표: ROC-AUC, PR-AUC, Recall, F1, Brier Score, DCA
 
@@ -100,6 +111,8 @@ streamlit run 04_streamlit_app.py
 ```bash
 python 05_forest_plot.py
 ```
+
+> ⚠️ 파일 상단 `DATA_PATH`는 개인 Google Drive 경로로 되어 있습니다. 본인 환경의 `0325_hn_all(med).csv` 경로로 수정한 뒤 실행하세요.
 
 - 3단계 계층적 로지스틱 회귀(Model 1→2→3) 각 변수의 OR을 Forest Plot으로 시각화
 - Model 3 전체 변수 Forest Plot, 모델별 적합도 변화 + 운동 그룹 OR, 성별 층화 비교 등 3종 차트 생성
@@ -166,6 +179,43 @@ AI 예측 위험도 + 임상 기준 위험 요인 병합
 
 - 임상 정보 미입력 시: ML 모델 예측 확률만 표시
 - 임상 기준 위험 요인 3개 이상 해당 시: 무조건 100%(확진 수준) 표시
+
+---
+
+## 🔧 트러블슈팅
+
+### 1) 약물 복용군 처리 방식 결정 — 배제 vs 보정
+
+**문제**: 고혈압·이상지질혈증·당뇨 약을 복용 중인 사람은 약물 효과로 검사 수치가 정상 범위에 들어오는 경우가 많습니다. 원본 수치만으로 대사증후군을 판정하면 실제로는 위험군인 사람을 정상으로 오분류하게 됩니다.
+
+**시도**: 약물 복용군을 진단 기준 산정에서 제외하는 방식과, 전원을 포함하되 약물 복용 시 해당 구성요소를 자동으로 '이상'으로 판정하는 방식(약물 보정)을 각각 전처리해서 비교했습니다.
+
+**결정**: 약물 보정 방식을 채택했습니다. 표본을 잃지 않으면서, 치료 중인 사람도 실질적인 위험군으로 반영하는 것이 임상적으로 더 타당하다고 판단했습니다. `01_data_processing.py` STEP 4-4에 약물 보정 매핑(`DI1_2`→`ms_bp`, `DI2_2`→`ms_tg`/`ms_hdl`, `DE1_31`·`DE1_32`→`ms_glu`)으로 남아 있습니다.
+
+### 2) 연속형 변수 전처리 방식 시행착오
+
+**문제**: 허리둘레·혈압·혈당·중성지방·HDL 같은 임상 수치는 극단치가 섞여 있어, 어떻게 다듬어야 통계 검정과 모델 성능 양쪽에서 무리가 없을지 바로 정해지지 않았습니다.
+
+**시도**: 윈저화 적용 전/후, 음주 변수를 다범주로 둘지 이분화할지 등 여러 버전을 각각 만들어 검정통계표 결과를 비교하며 최종 방식을 결정했습니다.
+
+**결정**: 연속형 변수는 상·하위 1% 윈저화, 음주는 '월 1회 이상 현재 음주 여부'로 이분화하는 방식으로 정착했습니다(`01_data_processing.py` STEP 4-3, STEP 5).
+
+### 3) 파일명-내용 뒤바뀜
+
+`01_data_processing.py` ↔ `03_modeling.py`는 이전 업로드 시 파일명과 내용이 뒤바뀌어 있었습니다. 지금은 파일명 그대로 내용이 일치하도록 정정된 상태입니다 (01=전처리, 03=모델링).
+
+---
+
+## 💡 배운 점
+
+**복합표본 통계 설계 이해와 적용**
+KNHANES는 단순 무작위 표본이 아니라 가중치·층화·집락을 반영한 복합표본 조사입니다. 이를 무시하고 단순 평균·빈도로 분석하면 모집단 대표성이 왜곡됩니다. 가중치 정규화(`w_norm`), `DescrStatsW` 기반 가중 t-검정/카이제곱 검정, `GLM(Binomial)` + `var_weights`/`cov_type='cluster'`를 직접 구현하면서 공중보건 데이터 특유의 표본 설계를 반영하는 통계 분석 역량을 익혔습니다.
+
+**임상 진단 기준의 코드화**
+간호학 배경을 살려 NCEP-ATP III 대사증후군 진단 기준과 약물 보정 로직을 직접 전처리 코드로 옮겼습니다. 임상 진단 기준을 판정 규칙(`ms_wc`, `ms_tg`, `ms_hdl`, `ms_bp`, `ms_glu`)으로 정확히 구현하는 과정에서, 도메인 지식과 데이터 처리 로직을 연결하는 역할을 경험했습니다.
+
+**가설 검증 기반 변수 선정 논리 구축**
+머신러닝 모델링에 앞서, 운동 그룹 변수가 실제로 독립적인 설명력을 가지는지 3단계 계층적 로지스틱 회귀(Model 1→2→3)와 LRT(우도비 검정)로 먼저 검증했습니다. `05_forest_plot.py`로 Model 3의 변수별 OR을 Forest Plot으로 시각화해 통계적 근거를 가진 핵심 예측 변수를 팀에 제시했고, 이 과정에서 '통계적으로 유의한 변수를 먼저 확정한 뒤 머신러닝으로 넘기는' 분석 설계 순서를 익혔습니다.
 
 ---
 
