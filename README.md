@@ -13,16 +13,17 @@
 ## 📌 프로젝트 개요
 
 청년층(20–39세) 대사증후군 유병률이 빠르게 증가하고 있음에도 기존 관리 시스템은 중장년층 위주로 설계되어 있습니다.  
-본 프로젝트는 라이프스타일(운동, 흡연, 음주)과 임상 정보를 통합하여 청년층 맞춤형 대사증후군 위험도를 예측하고, Streamlit 웹 인터페이스로 제공합니다.
+본 프로젝트는 라이프스타일(연령·성별·흡연·음주·운동) 기반 ML 위험도 예측과 임상 수치 기반 대사증후군 기준 확인을 결합하여, Streamlit 웹 인터페이스로 제공합니다.
 
 | 항목 | 내용 |
 |------|------|
 | 데이터 출처 | 국민건강영양조사(KNHANES) 제9기 (2022–2024) |
 | 분석 대상 | 20–39세 청년층 N=3,363명 |
-| 학습 데이터 | SMOTE 증강 후 N=4,728명 |
-| 테스트 데이터 | N=673명 (학습 데이터와 분리된 20% hold-out set) |
-| 최종 모델 | Tuned Logistic Regression + Isotonic Calibration |
-| 성능 (Test) | ROC-AUC 0.7347 · Recall 0.6923 · F1 0.3285 |
+| 학습/테스트 분할 | Stratified 8:2 (N=2,690 / N=673), SMOTENC는 학습 데이터 교차검증 내부에서만 적용 |
+| 최종 모델 | Tuned RandomForest + Isotonic Calibration |
+| 성능 (Test) | ROC-AUC 0.7122 · Recall 0.654 · F1 0.2812 |
+
+> ℹ️ 위 성능은 프로젝트 종료 후 리팩터링한 파이프라인(`06_model_refactor.py`) 기준입니다. 자세한 배경은 아래 "🔧 ML 파이프라인 리팩터링" 절 참고.
 
 ![연령대별 성별 분포](results/chart1_age_gender_distribution.png)
 
@@ -33,9 +34,13 @@
 | 항목 | 내용 |
 |------|------|
 | 개발 기간 | 2026.04 (약 1개월) |
-| 팀 구성 | 6인 팀 — 데이터 분석(DA) 2인, 기술 구현(TA) 2인이 실무 담당 |
-| 담당 역할 (본인) | **DA** — 데이터 전처리(`01_data_processing.py`), 검정통계표 작성(`02_statistical_table.py`), 3단계 계층적 로지스틱 회귀 및 Forest Plot(OR) 분석(`05_forest_plot.py`)을 단독 수행 |
-| 그 외 역할 | ML 모델링(`03_modeling.py`)과 Streamlit 웹 구현(`04_streamlit_app.py`)은 TA 팀원이 각 1인씩 담당 |
+| 팀 구성 | 6인 팀 — 기획(AA) 2인, 데이터 분석(DA) 2인, 모델링/구현(TA) 2인 |
+
+**프로젝트 당시 담당 (DA)**
+데이터 전처리(`01_data_processing.py`), 검정통계표 작성(`02_statistical_table.py`), 3단계 계층적 로지스틱 회귀 및 Forest Plot(OR) 분석(`05_forest_plot.py`)을 단독 수행. ML 모델링(`03_modeling.py`)과 Streamlit 웹 구현(`04_streamlit_app.py`)은 TA 팀원이 각 1인씩 담당.
+
+**🔧 프로젝트 종료 후 개인 개선**
+포트폴리오 정리 과정에서 두 부분을 다시 검토했습니다. TA가 작성한 `03_modeling.py`/`04_streamlit_app.py`에서 모델링 파이프라인의 구조적 문제(범주형 변수 처리, 교차검증 leakage, 서비스에 배포된 모델과 평가 모델의 불일치)를 발견해 `06_model_refactor.py`로 직접 리팩터링·재학습하고 `04_streamlit_app.py`의 모델 로딩 구조·임상 판정 로직도 함께 수정했습니다. 또한 본인이 작성한 3단계 계층적 로지스틱 회귀(`05_forest_plot.py`)도 KNHANES 복합표본 설계(가중치+층화+집락)를 완전히 반영하지 못했던 부분을 발견해 R `survey` 패키지로 재검증했습니다(`07_survey_analysis.R`). 자세한 내용은 "🔧 ML 파이프라인 리팩터링"과 "통계적 가설 검증" 절 참고.
 
 ---
 
@@ -49,11 +54,15 @@
 │
 ├── 01_data_processing.py      # [STEP 1] 원본 데이터 → 분석용 데이터셋 생성
 ├── 02_statistical_table.py    # [STEP 2] 기술통계 및 검정통계표 생성 (.xlsx)
-├── 03_modeling.py             # [STEP 3] 모델 학습, 평가, SHAP 분석 (Google Colab)
+├── 03_modeling.py             # [STEP 3] 모델 학습, 평가, SHAP 분석 (Google Colab, 팀 작성본 — 원본 보존)
 ├── 04_streamlit_app.py        # [STEP 4] 웹 서비스 구현
 ├── 05_forest_plot.py          # [STEP 5] 계층적 로지스틱 회귀 OR Forest Plot
+├── 06_model_refactor.py       # [STEP 6] (프로젝트 종료 후 개선) ML 파이프라인 리팩터링 + 재학습
+├── 07_survey_analysis.R       # [STEP 7] (프로젝트 종료 후 개선) 복합표본 설계(R survey) 재검증
+├── feature_utils.py           # 06/04에서 공용으로 쓰는 피처 인코딩 함수
+├── metabolic_risk_model.joblib  # 06에서 저장한 최종 모델 (04가 그대로 로드)
 │
-├── results/                   # README에 삽입된 결과 차트 (EDA, 모델 비교, Forest Plot)
+├── results/                   # README에 삽입된 결과 차트 (EDA, Forest Plot, 앱 화면)
 ├── requirements.txt
 └── README.md
 ```
@@ -110,6 +119,8 @@ Google Colab → 공유 드라이브 경로 설정 → 전체 실행
 streamlit run 04_streamlit_app.py
 ```
 
+`metabolic_risk_model.joblib`(6단계 산출물)과 `feature_utils.py`가 같은 폴더에 있어야 합니다.
+
 ### 5단계: Forest Plot 생성 (선택)
 
 ```bash
@@ -121,6 +132,32 @@ python 05_forest_plot.py
 - 3단계 계층적 로지스틱 회귀(Model 1→2→3) 각 변수의 OR을 Forest Plot으로 시각화
 - Model 3 전체 변수 Forest Plot, 모델별 적합도 변화 + 운동 그룹 OR, 성별 층화 비교 등 3종 차트 생성
 
+### 6단계: ML 파이프라인 재학습 (프로젝트 종료 후 개선, 선택)
+
+```bash
+python 06_model_refactor.py
+```
+
+- `data/0325_hn_all(med).csv`(3,363명 전체)를 새로 stratified 8:2 분할해 실행합니다 (팀이 만든 기존 `Original_Train_Data.csv`/`Test_Data.csv` 분할은 재사용하지 않음 — 이유는 아래 방법론 참고).
+- 5개 후보 모델(Logistic/RandomForest/XGBoost/LightGBM/CatBoost)을 학습 데이터 CV로 비교 → 최종 모델 선정 → Isotonic 보정 → threshold 산출 → test set 평가까지 한 번에 수행하고 `metabolic_risk_model.joblib`을 저장합니다.
+- macOS에서 XGBoost가 `libomp.dylib` 로드 오류를 낼 수 있습니다. `brew install libomp`로 해결됩니다.
+
+### 7단계: 복합표본 설계 재검증 (프로젝트 종료 후 개선, 선택, R 필요)
+
+```bash
+Rscript 07_survey_analysis.R
+```
+
+- R과 `survey` 패키지가 필요합니다: `install.packages("survey")`
+- 입력 파일은 `data/0325_hn_all(med).csv`가 아니라 `data/hn_all_full_merged.csv`입니다 — 원본 KNHANES 전체 표본(전 연령, `hn_all.csv`)에 `01_data_processing.py`가 만든 파생변수(`metabolic_syndrome` 등, 20-39세 analytic sample만 값 존재)를 `ID` 기준으로 합친 파일입니다. 20-39세만 먼저 잘라서 `svydesign()`을 만들면 그 하위표본에 없는 strata/PSU의 설계 정보가 사라져 분산추정이 편향될 수 있어, **원표본 전체로 design을 정의한 뒤 `subset()`으로 20-39세를 지정**하는 방식을 씁니다(survey 패키지 공식 권장 방식). 병합 방법:
+  ```python
+  full = pd.read_csv("data/hn_all.csv")[["ID","psu","kstrata","wt_itvex","age","sex"]]
+  sub = pd.read_csv("data/0325_hn_all(med).csv")[["ID","metabolic_syndrome","exercise_group","smoking_status","drinking_status"]]
+  full.merge(sub, on="ID", how="left").to_csv("data/hn_all_full_merged.csv", index=False)
+  ```
+- `svydesign`(weight+strata+PSU, 전 연령) → `subset(!is.na(metabolic_syndrome))`으로 20-39세 analytic sample 지정 → `svyglm(quasibinomial)`로 3단계 계층적 로지스틱 회귀를 재추정하고, `regTermTest`로 운동그룹 전체 효과를 Wald test로 확인합니다.
+- 분석 대상 3,363명 전체를 사용합니다 (ML용 train/test 분할과 무관).
+
 ---
 
 ## 🔬 핵심 방법론
@@ -130,44 +167,58 @@ python 05_forest_plot.py
 - **대사증후군 진단 기준**: 대한비만학회 NCEP-ATP III 기준 (5개 구성요소 중 3개 이상)
   - 복부비만(허리둘레), 고중성지방혈증, 저HDL콜레스테롤, 고혈압, 고공복혈당
 - **약물 보정**: 고혈압·이상지질혈증·당뇨 약복용자를 해당 구성요소 '이상'으로 판정
-- **클래스 불균형 보정**: 학습 데이터에 SMOTE 적용 (0:1 비율 1:1 균등화, 적용 후 5개 모델 전반에서 Recall 상승 확인 → 최종 모델 선정 시 Recall 우선 기준의 근거)
+- **클래스 불균형 보정**: 팀 원본 파이프라인(`03_modeling.py`)은 학습 데이터에 SMOTE를 적용 (0:1 비율 1:1 균등화). 이 방식의 한계와 개선은 아래 "🔧 ML 파이프라인 리팩터링" 절 참고
 
-### 모델 선정 근거
+### 통계적 가설 검증 — 운동 변수의 독립적 연관성
 
-통계적 설명력 확보를 위해 머신러닝 모델링 전 **3단계 계층적 로지스틱 회귀(LRT 검정)** 수행:
+연구 질문은 처음부터 끝까지 동일합니다 — *연령·성별·흡연·음주를 보정했을 때 운동그룹과 대사증후군은 어떤 연관성을 보이는가?* 이를 **3단계 계층적 로지스틱 회귀**(연령·성별 → 흡연·음주 → 운동그룹 순차 투입)로 검증했습니다.
 
-| 모델 | 추가 변수 | LRT p-value |
-|------|-----------|-------------|
-| Model 1 | 연령, 성별 | N/A |
-| Model 2 | + 흡연, 음주 | 0.0001 |
-| Model 3 | + 운동그룹 | < 0.0001 |
+당시(`05_forest_plot.py`)에는 KNHANES 표본가중치(`freq_weights`)와 PSU 단위 cluster-robust 표준오차로 이를 추정했는데, 층화(`kstrata`)까지는 반영하지 못한 상태였습니다. **프로젝트 종료 후**, 동일한 모델 구조를 R `survey` 패키지의 `svydesign`(weight + strata + PSU)·`svyglm(quasibinomial)`로 다시 추정했습니다(`07_survey_analysis.R`). 이때 20-39세만 먼저 잘라서 design을 만들지 않고, KNHANES 원표본 전체(전 연령, 20,191명)로 design을 정의한 뒤 `subset()`으로 20-39세 analytic sample(3,363명)을 지정했습니다 — subset 대상만으로 design을 만들면 그 하위표본에 없는 strata/PSU의 설계 정보가 사라져 분산추정이 편향될 수 있어, survey 패키지가 공식적으로 권장하는 방식입니다. LRT·AIC는 var_weights 기반 Binomial GLM에서 log-likelihood가 정의되지 않아 부적절하다는 statsmodels 문서의 지적과 같은 이유로 사용하지 않고, 운동그룹 전체 효과는 design-based Wald test(`regTermTest`)로 확인했습니다: **F=11.06 (df=3, 495), p<0.001**.
 
-운동 그룹의 독립적 연관성 확인 → 핵심 예측 변수로 확정
+Train/Test 분할은 ML 모델의 "새로운 사람에 대한 예측력"을 보기 위한 것이고, 이 통계 분석은 "분석 표본 내 연관성"을 보는 것이므로 분석 대상 전체 3,363명을 그대로 사용했습니다.
 
-`05_forest_plot.py`에서는 동일한 3단계 구조를 KNHANES 표본가중치(`freq_weights`)와 PSU 단위 cluster-robust 표준오차로 재추정해 OR을 확인합니다. 다른 변수를 보정한 상태에서 복합운동군의 대사증후군 odds는 운동을 하지 않는 군 대비 약 60% 낮게 나타났습니다(OR 0.40, 95% CI 0.28–0.57, p<0.001). 관찰연구 기반 분석이므로 인과관계로 해석하지 않았습니다.
+재추정한 결과는 이전 방법과 사실상 일치했습니다 — 복합운동군의 대사증후군 odds는 운동을 하지 않는 군 대비 약 60% 낮게 나타났습니다(OR 0.40, 95% CI 0.28–0.57, p<0.001). 관찰연구 기반 분석이므로 인과관계로 해석하지 않았습니다.
 
-> ⚠️ 표본가중치 적용과 PSU cluster-robust covariance는 반영했지만, 층화(`kstrata`)까지 포함하는 완전한 survey-design 분석은 아닙니다. `02_statistical_table.py`의 가중 t-검정·카이제곱 검정 역시 같은 이유로 탐색적 검정으로 해석했습니다.
+![Model 3 전체 변수 Forest Plot (복합표본 설계 반영)](results/forest_plot_1_model3_exercise_last.png)
 
-![Model 3 전체 변수 Forest Plot](results/forest_plot_1_model3_exercise_last.png)
+### 🔧 ML 파이프라인 리팩터링 (프로젝트 종료 후 개선)
 
-### 최종 모델 성능
+포트폴리오 정리 과정에서 팀이 작성한 `03_modeling.py`를 다시 검토하다 아래 문제를 발견했습니다.
+
+1. **범주형 변수를 인코딩 없이 그대로 투입** — `sex`/`smoking_status`/`drinking_status`/`exercise_group`을 정수 코드 그대로 SMOTE와 분류기에 넣었습니다. SMOTE가 이 값들을 연속형처럼 보간해 `exercise_group=1.64` 같은 존재하지 않는 값을 만들고, 모델도 그룹 간 간격이 동일하다고 가정하게 됩니다.
+2. **SMOTE를 교차검증 밖에서 한 번만 적용** — `train_test_split` 직후 학습셋 전체에 SMOTE를 적용한 뒤 `RandomizedSearchCV(cv=5)`에 넣어, 하이퍼파라미터 탐색의 각 validation fold에도 synthetic sample의 정보가 섞였습니다(leakage).
+3. **평가에 쓴 hold-out을 모델 선택에도 재사용** — 원 발표자료를 보면 673명 test set은 최종 평가 1회가 아니라 5개 모델 × 3개 보정방식을 비교해 최종 모델(Logistic+Isotonic)을 **선택**하는 데 이미 쓰였습니다.
+4. **평가한 모델과 배포된 모델이 다름** — `04_streamlit_app.py`는 이 모델을 저장·로드하지 않고 앱 실행 시 전체 데이터로 별도 재학습(SMOTE 없이, train/test 분리도 없이)했습니다. README에 보고한 성능과 실제 서비스 모델이 같은 모델이 아니었습니다.
+
+**개선(`06_model_refactor.py`)**: `SMOTENC`(범주형을 원래 코드 그대로 유지한 채 리샘플링) → 원-핫 인코딩 → 분류기를 하나의 `imblearn.Pipeline`으로 묶어 `RandomizedSearchCV`에 통째로 전달했습니다. 3,363명 전체를 새로 stratified 8:2 분할하고(팀의 기존 673명은 이미 모델 선택에 쓰였으므로 재사용하지 않음), 5개 후보 모델을 **학습 데이터 CV ROC-AUC만으로** 비교했습니다 — test set은 최종 평가 1회에만 사용:
+
+| 모델 | CV ROC-AUC |
+|---|---|
+| RandomForest | 0.7707 |
+| CatBoost | 0.7704 |
+| Logistic | 0.7686 |
+| XGBoost | 0.7661 |
+| LightGBM | 0.7647 |
+
+상위 3개 모델은 사실상 오차범위 내 차이지만, 사전에 정한 절차(CV 1위 모델 채택)를 그대로 따라 **RandomForest**를 최종 모델로 선정했습니다. Isotonic 보정 후 threshold는 학습 데이터의 교차검증 예측값(OOF)만으로 결정하고, 새 test set(N=673)에서 마지막 평가 1회를 수행했습니다.
 
 | 구분 | 값 |
 |------|----|
-| ROC-AUC | 0.7345 |
-| Survey-weighted ROC-AUC | 0.7323 |
-| Recall | 0.6923 |
-| F1 | 0.3285 |
+| ROC-AUC | 0.7122 |
+| Survey-weighted ROC-AUC | 0.7281 |
+| Recall | 0.654 (threshold=0.114) |
+| F1 | 0.2812 |
+| Brier | 0.0994 |
 
-> 아래는 하이퍼파라미터 튜닝 이전, 5개 후보 모델의 ROC/PR 곡선 비교입니다. 로지스틱 회귀가 이 단계에서도 가장 우수해 최종 모델로 선정 후 튜닝을 진행했습니다.
+기존(리팩터링 전) 수치 대비 다소 낮지만, leakage 없이 정직하게 재현한 결과입니다. 최종 모델이 RandomForest로 바뀌면서 회귀계수 기반 해석은 할 수 없게 됐지만, 운동 변수의 통계적 유의성은 위 3단계 계층적 로지스틱 회귀·Forest Plot 분석이 별도로 담당하고 있어 예측 모델의 선택과는 무관하게 유지됩니다.
 
-![5개 모델 ROC·PR 곡선 비교](results/ml_roc_pr_curves.png)
+`04_streamlit_app.py`도 이 모델을 `joblib.load()`로 그대로 불러오도록 수정해, README에 보고한 성능과 실제 서비스 모델이 같은 모델이 되도록 통일했습니다.
 
 ---
 
 ## 📊 주요 분석 결과
 
-- **성별·연령**: 5개 모델 공통 1순위 예측 변수 (SHAP 일관)
+- **성별·연령**: 원 팀 분석(`03_modeling.py`)의 SHAP 기준 5개 모델 공통 1순위 예측 변수
 - **운동 효과**: 복합운동(유산소+근력) 그룹 유병률 8.3% vs 미실천 그룹 16.4% (약 2배 차이)
 - **흡연**: 현재흡연 OR 1.80 (비흡연 대비 odds 약 79.9% 높음, p<0.001)
 - **음주**: p=0.289로 유의하지 않음 (J-curve 현상 및 금주자 편향 영향)
@@ -178,22 +229,23 @@ python 05_forest_plot.py
 
 ## 🌐 Streamlit 웹 서비스
 
-사용자 입력 흐름:
+ML 예측과 임상 기준 판정을 하나의 확률로 섞지 않고, 역할이 다른 두 결과로 분리해서 보여줍니다 (원래 서비스 설계도 "① AI 모델 예측"과 "② 임상정보 기반 위험요인 계산"을 별개 로직으로 두고 있었고, 이번 개선은 화면에서도 이 둘을 분리해서 보여주도록 정리한 것입니다).
 
 ```
-라이프스타일 입력 (연령·성별·흡연·음주·운동)
-    ↓
-임상 정보 선택 입력 (허리둘레·혈압·혈당·중성지방·HDL·약복용 여부)
-    ↓
-AI 예측 위험도 + 임상 기준 위험 요인 병합
-    ↓
-대사증후군 위험도(%) + 맞춤형 솔루션 가이드 출력
+① 라이프스타일 입력 (필수: 연령·성별·흡연·음주·운동)
+    → ML 모델(RandomForest)로 예측 확률 계산 (건강검진 수치는 사용하지 않음)
+    → "생활습관 기반 ML 스크리닝 — 예측 확률 n%"
+
+② 임상 정보 입력 (선택: 허리둘레·혈압·혈당·중성지방·HDL·약물 복용)
+    → NCEP-ATP III 5개 구성요소를 rule-based로 판정 (약물 복용 시 해당 항목 자동 반영)
+    → 5개 모두 입력 시: "n/5개 충족 → 기준 충족 / 미충족"
+    → 일부만 입력 시: "n개 확인됨, 나머지는 확인 보류" (모르는 항목을 정상으로 간주하지 않음)
+    → 미입력 시: 임상 기준 확인 결과 없음
 ```
 
-- 임상 정보 미입력 시: ML 모델 예측 확률만 표시
-- 임상 기준 위험 요인 3개 이상 해당 시: 무조건 100%(확진 수준) 표시
+두 결과는 항상 별도 카드로 표시되며, 임상 기준 3개 이상 충족을 ML 확률에 강제로 덮어씌우는 로직은 없습니다. 약물 복용 매핑은 `01_data_processing.py`와 동일하게 이상지질혈증 약 복용 시 중성지방·HDL 두 항목 모두에 반영됩니다.
 
-![AI 종합 진단 리포트 화면](results/app_screenshot_diagnosis.png)
+![생활습관 기반 ML 위험도 예측과 임상정보 입력 상태에 따른 기준 확인 결과를 분리 제공](results/app_screenshot_risk_check.png)
 
 ---
 
@@ -223,10 +275,13 @@ AI 예측 위험도 + 임상 기준 위험 요인 병합
 NCEP-ATP III 대사증후군 진단 기준과 약물 복용 여부를 판정 규칙(`ms_wc`, `ms_tg`, `ms_hdl`, `ms_bp`, `ms_glu`)으로 코드화하여, 임상 지식을 분석 가능한 파생변수로 변환했습니다.
 
 **KNHANES 가중 분석 설계**
-국민건강영양조사의 표본 가중치를 기술통계(`DescrStatsW` 가중 t-검정) 및 카이제곱 검정에 적용하고, 로지스틱 회귀에는 `freq_weights`와 PSU 단위 cluster-robust covariance(`cov_type='cluster'`)를 적용했습니다. 다만 층화(`kstrata`)까지 포함하는 완전한 survey-design 분석은 아니라는 점을 인지하고, 검정 결과를 탐색적 수준으로 해석했습니다.
+국민건강영양조사의 표본 가중치를 기술통계(`DescrStatsW` 가중 t-검정) 및 카이제곱 검정에 적용했습니다. `02_statistical_table.py`의 이 기술통계표는 가중치만 반영하고 층화·집락까지 포함하는 완전한 survey-design 검정은 아니라, 탐색적 수준으로 해석했습니다.
 
 **가설 검증을 통한 변수 효과 분석**
 연령·성별 → 흡연·음주 → 운동그룹을 순차적으로 추가하는 3단계 계층적 로지스틱 회귀로 모델 적합도 변화와 OR을 비교하고, Forest Plot으로 시각화해 통계적 근거를 가진 핵심 예측 변수를 팀에 제시했습니다.
+
+**(프로젝트 종료 후) 복합표본 설계 재검증 및 ML 파이프라인 리팩터링**
+포트폴리오 정리 과정에서 두 가지를 다시 검토했습니다. 첫째, 본인이 작성한 3단계 계층적 로지스틱 회귀(`05_forest_plot.py`)가 표본가중치·집락은 반영했지만 층화까지는 반영하지 못했다는 걸 발견해, R `survey` 패키지(`svydesign`+`svyglm`+`regTermTest`)로 weight·strata·PSU를 모두 반영해 재추정했습니다(`07_survey_analysis.R`) — 결과는 기존과 거의 일치해 원래 분석이 견고했음을 재확인했습니다. 둘째, 팀이 작성한 ML 모델링 코드(`03_modeling.py`)에서 범주형 변수 인코딩 누락, SMOTE-CV leakage, 모델 선택에 hold-out이 재사용된 점, 평가 모델과 배포 모델의 불일치까지 구조적 문제를 발견해 `SMOTENC` 기반 `imblearn.Pipeline`으로 재구성하고(`06_model_refactor.py`) Streamlit 앱이 이 검증된 모델을 그대로 불러오도록 통일했습니다. 처음 만든 코드가 아니어도 구조를 끝까지 따라가며 문제를 진단하고, 통계적으로도 방법론적으로도 더 정확한 근거를 가진 결과로 마무리하는 경험이었습니다.
 
 ---
 
@@ -327,6 +382,8 @@ NCEP-ATP III 대사증후군 진단 기준과 약물 복용 여부를 판정 규
 - 설문·검진 데이터 기반으로 활동량·수면 등 실시간 데이터 미반영
 - 식단 정보 미포함으로 영양 관련 케어 기능 제한
 - 장기적 개선 효과 모니터링 및 공공기관 사업 연계 미비
+- 리팩터링 후 5개 후보 모델의 CV ROC-AUC가 상위 3개(RandomForest·CatBoost·Logistic) 모두 0.77 안팎으로 오차범위 내 차이 — 사전에 정한 절차(CV 1위 채택)를 따랐지만, 다른 시드/분할에서는 순위가 바뀔 수 있음
+- 최종 모델이 RandomForest라 회귀계수 기반 해석은 어려움 (변수 간 연관성 해석은 별도의 통계 분석(Forest Plot)이 담당)
 
 **향후 과제**
 - 스마트워치 실시간 데이터 통합으로 예측 정밀도 향상
@@ -345,7 +402,6 @@ NCEP-ATP III 대사증후군 진단 기준과 약물 복용 여부를 판정 규
 
 ---
 
-## 📄 라이선스
+## 📄 데이터 이용 안내
 
-본 프로젝트는 학술 및 교육 목적으로 작성되었습니다.  
-KNHANES 원본 데이터는 [질병관리청 이용 정책](https://knhanes.kdca.go.kr)을 따릅니다.
+본 프로젝트는 학술 및 교육 목적으로 작성되었습니다. KNHANES 원본 데이터는 저장소에 포함하지 않으며, [질병관리청 국민건강영양조사 이용 정책](https://knhanes.kdca.go.kr)을 따릅니다.

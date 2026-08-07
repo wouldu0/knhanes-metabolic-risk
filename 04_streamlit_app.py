@@ -3,18 +3,16 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.linear_model import LogisticRegression
-from sklearn.calibration import CalibratedClassifierCV
-from scipy.stats import loguniform
-from sklearn.model_selection import RandomizedSearchCV
+import joblib
 from streamlit_option_menu import option_menu
+from feature_utils import RAW_COLUMNS
 import warnings
 warnings.filterwarnings('ignore')
 
 # ──────────────────────────────────────────────────────────────
 # ★ 초기 설정 및 데이터 로드
 # ──────────────────────────────────────────────────────────────
-st.set_page_config(page_title="2030 대사증후군 AI 진단", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="2030 대사증후군 AI 위험도 예측", layout="wide", initial_sidebar_state="collapsed")
 
 # 🎨 [컬러 팔레트 정의]
 PRIMARY_LIME = '#c3ee41'
@@ -59,39 +57,18 @@ def load_data():
 
 df = load_data()
 
+# 학습·평가까지 끝낸 모델을 그대로 불러온다 (06_model_refactor.py에서 생성).
+# 앱에서 재학습하지 않으므로, README에 보고한 성능 지표와 실제 서비스 모델이 항상 같다.
+# 파이프라인이 raw 컬럼(age, sex, smoking_status, drinking_status, exercise_group)을
+# 그대로 받으므로 앱에서 별도로 원-핫 인코딩할 필요가 없다.
+MODEL_THRESHOLD = 0.1143  # 06_model_refactor.py에서 산출한 Youden's J 기준 threshold (참고용)
+
 @st.cache_resource
-def train_ml_engine(data):
-    features = ['age', 'male', 'smoke_past', 'smoke_current', 'drink_current', 'ex_1', 'ex_2', 'ex_3']
-    X = data[features]
-    y = data['metabolic_syndrome']
-
-    param_grid_lr = {
-        'C': loguniform(1e-3, 1e2),
-        'penalty': ['l1', 'l2'],
-        'solver': ['saga'],
-        'max_iter': [2000],
-    }
-    lr_base = LogisticRegression(random_state=42)
-    random_search = RandomizedSearchCV(
-        estimator=lr_base,
-        param_distributions=param_grid_lr,
-        n_iter=30,
-        scoring='roc_auc',
-        cv=5,
-        n_jobs=-1,
-        random_state=42
-    )
-    random_search.fit(X, y)
-
-    final_lr = LogisticRegression(**random_search.best_params_, random_state=42)
-    calibrated_lr = CalibratedClassifierCV(estimator=final_lr, method='isotonic', cv=5)
-    calibrated_lr.fit(X, y)
-
-    return calibrated_lr
+def load_ml_engine():
+    return joblib.load("metabolic_risk_model.joblib")
 
 if not df.empty:
-    with st.spinner("🤖 AI 예측 모델을 준비 중입니다..."):
-        model = train_ml_engine(df)
+    model = load_ml_engine()
 
 # ==============================================================================
 # 🎨 그래프 테마 설정
@@ -186,11 +163,12 @@ st.markdown(f"""
 # ==============================================================================
 # 🚀 상단 타이틀 및 옵션 메뉴
 # ==============================================================================
-st.markdown(f"<h2 style='text-align: center; margin-top: 15px; margin-bottom: 30px; color: {FIGMA_TEXT} !important;'> 2030 대사증후군 AI 진단</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='text-align: center; margin-top: 15px; margin-bottom: 5px; color: {FIGMA_TEXT} !important;'> 2030 대사증후군 AI 위험도 예측</h2>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; margin-bottom: 25px; color: {FIGMA_SUBTEXT} !important;'>생활습관 정보를 기반으로 대사증후군 위험도를 예측하고, 건강검진 정보 입력 시 임상 기준 충족 여부를 함께 확인합니다.</p>", unsafe_allow_html=True)
 
 selected = option_menu(
     menu_title=None,
-    options=["🩺 AI 진단 서비스", "📊 데이터 인사이트", "ℹ️ 프로젝트 정보"], # 이모지 추가
+    options=["🩺 AI 위험도 예측", "📊 데이터 인사이트", "ℹ️ 프로젝트 정보"], # 이모지 추가
     # icons=["heart-pulse-fill", "bar-chart-fill", "info-circle-fill"], # 기존 아이콘 제거
     menu_icon="cast",
     default_index=0,
@@ -209,13 +187,13 @@ selected = option_menu(
 if df.empty: st.stop()
 
 # ==============================================================================
-# 1️⃣ AI 진단 서비스 페이지
+# 1️⃣ AI 위험도 예측 페이지
 # ==============================================================================
-if selected == "🩺 AI 진단 서비스": # 메뉴 이름 수정 반영
+if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
 
     with st.container(border=True):
         st.markdown("##### 📝 나의 건강 정보 입력")
-        st.caption("AI의 정확한 진단을 위해 아래 정보를 빠짐없이 입력해주세요.")
+        st.caption("AI의 정확한 예측을 위해 아래 정보를 빠짐없이 입력해주세요.")
         st.markdown("---")
 
         col_lifestyle, col_clinical = st.columns(2, gap="large")
@@ -234,7 +212,7 @@ if selected == "🩺 AI 진단 서비스": # 메뉴 이름 수정 반영
 
         with col_clinical:
             st.markdown("<h5 style='color:#333; margin-bottom:18px;'>🩸 임상 정보 (선택)</h5>", unsafe_allow_html=True)
-            st.caption("※ 모를 경우 0 유지 (정밀 진단을 위해 입력을 권장합니다)")
+            st.caption("※ 모를 경우 0 유지 (정밀 예측을 위해 입력을 권장합니다)")
             u_waist = st.number_input("📏 허리둘레 (cm)", min_value=0.0, value=0.0)
 
             # 혈압 입력 (수축기/이완기 나란히 배치)
@@ -259,79 +237,80 @@ if selected == "🩺 AI 진단 서비스": # 메뉴 이름 수정 반영
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         _, btn_col, _ = st.columns([1.2, 2, 1.2])
-        run_btn = btn_col.button("🚀 AI 종합 진단 실행하기", type="primary", use_container_width=True)
+        run_btn = btn_col.button("🚀 위험도 확인하기", type="primary", use_container_width=True)
 
     if not run_btn:
         st.markdown("<br>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<div style='text-align:center; padding: 70px 0;'>", unsafe_allow_html=True)
-            st.markdown(f"<h3 style='color: {FIGMA_SUBTEXT} !important; font-weight:600 !important;'>👆 위 폼에 정보를 입력하고 진단을 실행하세요</h3>", unsafe_allow_html=True)
-            st.markdown("<p style='font-size:16px;'>AI가 나의 대사증후군 위험도를 즉시 분석해 드립니다.</p>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='color: {FIGMA_SUBTEXT} !important; font-weight:600 !important;'>👆 위 폼에 정보를 입력하고 위험도를 확인하세요</h3>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:16px;'>생활습관 정보만으로 ML 위험도를 먼저 확인하고, 건강검진 수치가 있다면 대사증후군 임상 기준 충족 여부도 함께 보여드립니다.</p>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.markdown("<br>", unsafe_allow_html=True)
 
-        risk_count = 0
-        risk_factors = []
-        med_factors = []
-
-        if u_waist > 0:
-            if (u_sex == "남성" and u_waist >= 90) or (u_sex == "여성" and u_waist >= 85):
-                risk_count += 1; risk_factors.append("복부비만")
-
-        #이완기 혈압 로직 반영 (수축기 130 이상 OR 이완기 85 이상)
-        if u_sbp > 0 or u_dbp > 0 or med_bp:
-            is_risk = False
-            if u_sbp >= 130 or u_dbp >= 85: is_risk = True
-            if med_bp: is_risk = True; med_factors.append("혈압")
-            if is_risk: risk_count += 1; risk_factors.append("높은 혈압")
-
-        if u_fbs > 0 or med_sugar:
-            is_risk = False
-            if u_fbs >= 100: is_risk = True
-            if med_sugar: is_risk = True; med_factors.append("혈당")
-            if is_risk: risk_count += 1; risk_factors.append("높은 공복혈당")
-        if u_tg > 0 or med_lipid:
-            is_risk = False
-            if u_tg >= 150: is_risk = True
-            if med_lipid: is_risk = True; med_factors.append("중성지방/고지혈증약")
-            if is_risk: risk_count += 1; risk_factors.append("높은 중성지방")
-        if u_hdl > 0:
-            if (u_sex == "남성" and u_hdl < 40) or (u_sex == "여성" and u_hdl < 50):
-                risk_count += 1; risk_factors.append("낮은 HDL")
-
-        input_data = {
-            'age': u_age, 'male': 1 if u_sex == "남성" else 0,
-            'smoke_past': 1 if u_smoke == "과거 흡연" else 0, 'smoke_current': 1 if u_smoke == "현재 흡연" else 0,
-            'drink_current': 1 if u_drink == "현재 음주" else 0, 'ex_1': 1 if u_ex == "복합(유산소+근력)" else 0,
-            'ex_2': 1 if u_ex == "근력 운동만" else 0, 'ex_3': 1 if u_ex == "유산소 운동만" else 0
+        # ── ① ML 스크리닝: 생활습관 5개 변수만 모델에 입력 (임상 수치는 사용하지 않음) ──
+        raw_input = {
+            'age': u_age,
+            'sex': 1 if u_sex == "남성" else 2,
+            'smoking_status': {'비흡연': 0, '과거 흡연': 1, '현재 흡연': 2}[u_smoke],
+            'drinking_status': 1 if u_drink == "현재 음주" else 0,
+            'exercise_group': {'복합(유산소+근력)': 1, '근력 운동만': 2, '유산소 운동만': 3, '운동 안 함': 4}[u_ex],
         }
-        ai_pred_prob = model.predict_proba(pd.DataFrame([input_data]))[0][1] * 100
+        ai_pred_prob = model.predict_proba(pd.DataFrame([raw_input])[RAW_COLUMNS])[0][1] * 100
 
-        if risk_count >= 3:
-            display_prob = 100.0
-            gauge_title = "대사증후군 확진 (임상 기준)"
-            gauge_color = COLOR_DANGER
-        else:
-            display_prob = ai_pred_prob
-            gauge_title = "AI 라이프스타일 위험도"
-            if display_prob < 20: gauge_color = COLOR_SAFE
-            elif display_prob < 50: gauge_color = COLOR_WARN
-            else: gauge_color = COLOR_DANGER
+        # ── ② 임상 기준 판정: NCEP-ATP III 5개 구성요소, 약물 복용 시 해당 항목 자동 반영 ──
+        # (전처리 스크립트 01_data_processing.py와 동일한 매핑: 이상지질혈증 약은
+        #  중성지방·HDL 두 항목 모두에 반영)
+        components = {}  # name -> True(이상)/False(정상)/None(모름)
+
+        components['복부비만'] = None
+        if u_waist > 0:
+            components['복부비만'] = (u_sex == "남성" and u_waist >= 90) or (u_sex == "여성" and u_waist >= 85)
+
+        components['높은 혈압'] = None
+        if u_sbp > 0 or u_dbp > 0 or med_bp:
+            components['높은 혈압'] = (u_sbp >= 130) or (u_dbp >= 85) or med_bp
+
+        components['높은 공복혈당'] = None
+        if u_fbs > 0 or med_sugar:
+            components['높은 공복혈당'] = (u_fbs >= 100) or med_sugar
+
+        components['높은 중성지방'] = None
+        if u_tg > 0 or med_lipid:
+            components['높은 중성지방'] = (u_tg >= 150) or med_lipid
+
+        components['낮은 HDL'] = None
+        if u_hdl > 0 or med_lipid:
+            components['낮은 HDL'] = ((u_sex == "남성" and 0 < u_hdl < 40) or (u_sex == "여성" and 0 < u_hdl < 50)) or med_lipid
+
+        known_items = {k: v for k, v in components.items() if v is not None}
+        known_count = len(known_items)
+        risk_count = sum(1 for v in known_items.values() if v)
+        risk_factors = [k for k, v in known_items.items() if v]
+        med_factors = []
+        if med_bp: med_factors.append("혈압")
+        if med_sugar: med_factors.append("혈당")
+        if med_lipid: med_factors.append("중성지방/HDL")
 
         with st.container(border=True):
-            st.markdown("#### 💡 AI 종합 진단 리포트")
+            st.markdown("#### 💡 예측 리포트")
             st.markdown("---")
 
-            res_chart_col, res_text_col = st.columns([1, 1.4], gap="large")
+            col_ml, col_clinical = st.columns([1, 1.2], gap="large")
 
-            with res_chart_col:
+            # ── ML 스크리닝 결과 (항상 표시) ──
+            with col_ml:
+                st.markdown("<h5>🤖 생활습관 기반 ML 스크리닝</h5>", unsafe_allow_html=True)
+                if ai_pred_prob < 20: gauge_color = COLOR_SAFE
+                elif ai_pred_prob < 50: gauge_color = COLOR_WARN
+                else: gauge_color = COLOR_DANGER
+
                 fig_gauge = go.Figure(go.Indicator(
-                    mode = "gauge+number",
-                    value = display_prob,
-                    number = {'suffix': "%", 'font': {'size': 48, 'color': gauge_color, 'weight':'bold'}},
-                    title = {'text': gauge_title, 'font': {'size': 18, 'color': FIGMA_TEXT, 'weight':'bold'}},
-                    gauge = {
+                    mode="gauge+number",
+                    value=ai_pred_prob,
+                    number={'suffix': "%", 'font': {'size': 40, 'color': gauge_color, 'weight': 'bold'}},
+                    gauge={
                         'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white", 'visible': False},
                         'bar': {'color': gauge_color},
                         'bgcolor': "#F0F2F6",
@@ -343,41 +322,56 @@ if selected == "🩺 AI 진단 서비스": # 메뉴 이름 수정 반영
                         ]
                     }
                 ))
-                fig_gauge.update_layout(height=310, margin=dict(l=25, r=25, t=55, b=25), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color=FIGMA_TEXT, family="Helvetica Neue, sans-serif"))
+                fig_gauge.update_layout(height=250, margin=dict(l=25, r=25, t=15, b=15), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color=FIGMA_TEXT, family="Helvetica Neue, sans-serif"))
                 st.plotly_chart(fig_gauge, use_container_width=True)
+                st.caption("나이·성별·흡연·음주·운동 습관만으로 계산한 통계적 예측 확률입니다. 건강검진 수치와는 별개의 결과입니다.")
 
-            with res_text_col:
-                st.markdown("<h5 style='margin-bottom:18px;'>📋 진단 요약</h5>", unsafe_allow_html=True)
-
-                if risk_count >= 3: st.error(f"🚨 **대사증후군 확진 수준** : 임상 수치 분석 결과 **{risk_count}개**의 위험 요인을 보유 중입니다.")
+            # ── 임상 기준 판정 결과 (검진 정보 입력량에 따라 분기) ──
+            with col_clinical:
+                st.markdown("<h5>🩺 대사증후군 임상 기준 확인</h5>", unsafe_allow_html=True)
+                if known_count == 0:
+                    st.info("건강검진 수치를 입력하면 대사증후군 5개 임상 기준 충족 여부를 확인할 수 있습니다.")
                 else:
-                    if ai_pred_prob >= 50: st.error(f"🚨 **고위험군** : 현재 생활 습관은 만성질환 발병 가능성이 매우 높습니다.")
-                    elif ai_pred_prob >= 20: st.warning(f"🟡 **주의 단계** : 대사증후군으로 진행될 수 있습니다. 생활 패턴 개선이 시급합니다.")
-                    else: st.success(f"✅ **안전** : 현재 매우 훌륭한 건강 습관을 유지하고 계십니다!")
+                    if known_count == 5:
+                        if risk_count >= 3:
+                            st.error(f"🚨 **구성요소 {risk_count}/5개 충족 → 대사증후군 임상 기준을 충족합니다.**")
+                        else:
+                            st.success(f"✅ **구성요소 {risk_count}/5개 충족 → 대사증후군 임상 기준에 해당하지 않습니다.**")
+                    else:
+                        st.warning(f"🟡 **입력된 정보에서 {risk_count}/{known_count}개 위험요인이 확인되었습니다.** "
+                                   f"나머지 {5 - known_count}개 항목을 몰라 기준 충족 여부는 확인 보류입니다.")
 
-                if med_factors: st.info(f"💡 안내: 현재 복용 중인 약물({', '.join(med_factors)}) 정보가 위험 요인 계산에 반영되었습니다.")
+                    for name in ['복부비만', '높은 혈압', '높은 공복혈당', '높은 중성지방', '낮은 HDL']:
+                        val = components[name]
+                        icon = "✅" if val is True else ("⬜" if val is False else "❔")
+                        st.write(f"{icon} {name}")
 
-                st.markdown("---")
-                st.markdown("<h5 style='margin-bottom:18px;'>🏃‍♂️ 맞춤형 솔루션 가이드</h5>", unsafe_allow_html=True)
-                if risk_count >= 3: st.write(f"🚨 **[총평]**: 의학적 확진 기준을 충족합니다. 반드시 전문의와 상담하시고 생활 습관을 전면적으로 교정해야 합니다.")
+                    if med_factors:
+                        st.caption(f"💊 복용 중인 약물({', '.join(med_factors)}) 정보가 해당 항목 판정에 반영되었습니다.")
 
-                guideline_count = 0
-                if u_ex != "복합(유산소+근력)":
-                    st.write("✔️ **[운동]**: 대사증후군 개선에는 유산소와 근력을 병행하는 **'복합 운동'**이 가장 효과적입니다. 현재 루틴에 부족한 운동을 추가하세요.")
-                    guideline_count += 1
+            st.markdown("---")
+            st.markdown("<h5 style='margin-bottom:18px;'>🏃‍♂️ 맞춤형 솔루션 가이드</h5>", unsafe_allow_html=True)
 
-                if risk_count > 0:
-                    guideline_text = "✔️ **[집중 관리]**: "
-                    if "복부비만" in risk_factors: guideline_text += "복부비만 관리(정제 탄수화물 감소), "
-                    if "높은 혈압" in risk_factors: guideline_text += "나트륨 섭취 감소, "
-                    if "높은 공복혈당" in risk_factors: guideline_text += "식후 30분 산책 권장, "
-                    if "높은 중성지방" in risk_factors: guideline_text += "야식 및 음주 제한, "
-                    if "낮은 HDL" in risk_factors: guideline_text += "꾸준한 유산소 운동 실천, "
-                    st.write(guideline_text.strip(", "))
-                    guideline_count += 1
+            if known_count == 5 and risk_count >= 3:
+                st.write("🚨 **[총평]**: 대사증후군 임상 기준을 충족합니다. 반드시 전문의와 상담하시고 생활 습관을 전면적으로 교정해야 합니다.")
 
-                if guideline_count == 0 and risk_count < 3:
-                    st.write("✔️ 지금처럼 꾸준히 운동하고 규칙적인 삶을 이어가세요! 정기적인 검진은 필수입니다.")
+            guideline_count = 0
+            if u_ex != "복합(유산소+근력)":
+                st.write("✔️ **[운동]**: 대사증후군 개선에는 유산소와 근력을 병행하는 **'복합 운동'**이 가장 효과적입니다. 현재 루틴에 부족한 운동을 추가하세요.")
+                guideline_count += 1
+
+            if risk_count > 0:
+                guideline_text = "✔️ **[집중 관리]**: "
+                if "복부비만" in risk_factors: guideline_text += "복부비만 관리(정제 탄수화물 감소), "
+                if "높은 혈압" in risk_factors: guideline_text += "나트륨 섭취 감소, "
+                if "높은 공복혈당" in risk_factors: guideline_text += "식후 30분 산책 권장, "
+                if "높은 중성지방" in risk_factors: guideline_text += "야식 및 음주 제한, "
+                if "낮은 HDL" in risk_factors: guideline_text += "꾸준한 유산소 운동 실천, "
+                st.write(guideline_text.strip(", "))
+                guideline_count += 1
+
+            if guideline_count == 0 and risk_count == 0:
+                st.write("✔️ 지금처럼 꾸준히 운동하고 규칙적인 삶을 이어가세요! 정기적인 검진은 필수입니다.")
 
 # ==============================================================================
 # 2️⃣ 데이터 인사이트 페이지

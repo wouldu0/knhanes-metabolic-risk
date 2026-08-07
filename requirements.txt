@@ -13,3 +13,4 @@ seaborn
 streamlit
 plotly
 streamlit-option-menu
+joblib
