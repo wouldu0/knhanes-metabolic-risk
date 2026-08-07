@@ -212,7 +212,7 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
 
         with col_clinical:
             st.markdown("<h5 style='color:#333; margin-bottom:18px;'>🩸 임상 정보 (선택)</h5>", unsafe_allow_html=True)
-            st.caption("대사증후군 임상 기준 확인을 위해, 건강검진 결과가 있다면 입력해주세요. (모를 경우 0 유지)")
+            st.caption("건강검진 결과가 있다면 입력해주세요. 대사증후군 임상 기준 확인에 사용됩니다.")
             u_waist = st.number_input("📏 허리둘레 (cm)", min_value=0.0, value=0.0)
 
             # 혈압 입력 (수축기/이완기 나란히 배치)
