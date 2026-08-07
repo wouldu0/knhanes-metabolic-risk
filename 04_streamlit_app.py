@@ -193,7 +193,7 @@ if selected == "🩺 AI 위험도 예측": # 메뉴 이름 수정 반영
 
     with st.container(border=True):
         st.markdown("##### 📝 나의 건강 정보 입력")
-        st.caption("AI의 정확한 예측을 위해 아래 정보를 빠짐없이 입력해주세요.")
+        st.caption("라이프스타일 정보는 ML 위험도 예측에 사용되며, 건강검진 정보는 선택 입력으로 임상 기준 확인에 사용됩니다.")
         st.markdown("---")
 
         col_lifestyle, col_clinical = st.columns(2, gap="large")
