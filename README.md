@@ -1,12 +1,14 @@
+<div align="center">
+
 # 🩺 KNHANES 기반 청년층 대사증후군 위험 분석 및 예측
 
 > **국민건강영양조사(KNHANES) 데이터를 활용해 20–39세 청년층의 대사증후군 관련 요인을 분석하고, 생활습관 기반 위험도 예측 서비스를 구현한 프로젝트입니다.**
 
----
-
 ## 🎬 시연 영상
 
 [![시연 영상](https://img.youtube.com/vi/XTdkpUgz3Tk/maxresdefault.jpg)](https://youtu.be/XTdkpUgz3Tk)
+
+</div>
 
 ---
 
