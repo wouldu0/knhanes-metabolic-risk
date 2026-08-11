@@ -14,8 +14,8 @@
     [8] 최종 분석 데이터셋 저장
 
   약물 보정 매핑 (코드북 확인 완료):
-    DI1_2  = 고혈압 의사진단      → ms_bp = 1
-    DI2_2  = 이상지질혈증 의사진단 → ms_tg = 1, ms_hdl = 1
+    DI1_2  = 혈압조절제 복용      → ms_bp = 1
+    DI2_2  = 이상지질혈증약 복용   → ms_tg = 1, ms_hdl = 1
     DE1_31 = 인슐린 투여          → ms_glu = 1
     DE1_32 = 경구혈당강하제 복용  → ms_glu = 1
 
@@ -60,8 +60,8 @@ print(f"  20~39세 필터링 후: {len(df):,}명")
 print("\n[STEP 2] ★ 약물 복용군 제외 없음 (전원 포함) ★")
 
 med_mask = (
-    df["DI1_2"].isin([1, 2, 3, 4]) |   # 고혈압 진단
-    df["DI2_2"].isin([1, 2, 3, 4]) |   # 이상지질혈증 진단
+    df["DI1_2"].isin([1, 2, 3, 4]) |   # 혈압조절제 복용
+    df["DI2_2"].isin([1, 2, 3, 4]) |   # 이상지질혈증약 복용
     df["DE1_31"].eq(1) |                # 인슐린 투여
     df["DE1_32"].eq(1)                  # 경구혈당강하제 복용
 )
@@ -143,12 +143,14 @@ print(f"  흡연 상태 분포:\n{df['smoking_status'].value_counts(dropna=False
 # ──────────────────────────────────────────────────────────────
 # BD1_11: 최근 1년간 음주 빈도
 #   2~6 = 현재 음주자 (월 1회 이상)
-#   그 외 = 비음주 또는 과거 음주 → 0으로 통합
+#   8   = 비해당(평생 비음주) → 0
+#   9   = 모름/무응답 → NaN (0으로 흡수하지 않음)
 
 print("\n[STEP 4-3] 음주 여부 파생변수 생성")
 
 curr_drinker = df["BD1_11"].isin([2, 3, 4, 5, 6])
 df["drinking_status"] = np.where(curr_drinker, 1, 0)
+df.loc[df["BD1_11"].isin([9]) | df["BD1_11"].isna(), "drinking_status"] = np.nan
 print(f"  음주 여부 분포:\n{df['drinking_status'].value_counts(dropna=False).sort_index().to_string()}")
 
 
@@ -164,8 +166,8 @@ print(f"  음주 여부 분포:\n{df['drinking_status'].value_counts(dropna=Fals
 #   5) 높은 공복혈당 (ms_glu): ≥100 mg/dL
 #
 # 약물 보정 (코드북 확인 완료):
-#   DI1_2  ∈ [1,2,3,4] = 고혈압 의사진단      → ms_bp  = 1
-#   DI2_2  ∈ [1,2,3,4] = 이상지질혈증 의사진단 → ms_tg  = 1, ms_hdl = 1
+#   DI1_2  ∈ [1,2,3,4] = 혈압조절제 복용        → ms_bp  = 1
+#   DI2_2  ∈ [1,2,3,4] = 이상지질혈증약 복용     → ms_tg  = 1, ms_hdl = 1
 #   DE1_31 == 1         = 인슐린 투여           → ms_glu = 1
 #   DE1_32 == 1         = 경구혈당강하제 복용   → ms_glu = 1
 #
@@ -174,8 +176,8 @@ print(f"  음주 여부 분포:\n{df['drinking_status'].value_counts(dropna=Fals
 print("\n[STEP 4-4] 대사증후군 판정 ★ 약물 보정 포함 ★")
 
 # ── 약물 복용 플래그 설정 ──
-is_bp_med    = df["DI1_2"].isin([1, 2, 3, 4])          # 고혈압 진단 → 혈압 보정
-is_lipid_med = df["DI2_2"].isin([1, 2, 3, 4])          # 이상지질혈증 진단 → 지질 보정
+is_bp_med    = df["DI1_2"].isin([1, 2, 3, 4])          # 혈압조절제 복용 → 혈압 보정
+is_lipid_med = df["DI2_2"].isin([1, 2, 3, 4])          # 이상지질혈증약 복용 → 지질 보정
 is_glu_med   = (df["DE1_31"] == 1) | (df["DE1_32"] == 1)  # 인슐린/혈당강하제 → 혈당 보정
 
 # ── 5대 구성요소 판정 (수치 + 약물 보정 동시 적용) ──
@@ -313,8 +315,8 @@ print(f"  칼럼 수: {df_final.shape[1]}개")
 print(f"  저장 경로: {OUTPUT_PATH}")
 print()
 print("  약물 보정 매핑 (코드북 확인 완료):")
-print("    DI1_2  (고혈압 진단)      → ms_bp  = 1")
-print("    DI2_2  (이상지질혈증 진단) → ms_tg = 1, ms_hdl = 1")
+print("    DI1_2  (혈압조절제 복용)      → ms_bp  = 1")
+print("    DI2_2  (이상지질혈증약 복용) → ms_tg = 1, ms_hdl = 1")
 print("    DE1_31 (인슐린 투여)       → ms_glu = 1")
 print("    DE1_32 (경구혈당강하제)     → ms_glu = 1")
 print("=" * 60)
