@@ -2,7 +2,15 @@
 ══════════════════════════════════════════════════════════════
   Forest Plot — ★ 운동을 마지막에 투입하는 구조 ★
 
-  ★ CONFIG의 DATA_PATH만 본인 경로로 바꿔주세요!
+  ⚠️ 이 파일은 초기 탐색·시각화 단계의 분석 코드입니다.
+     여기서 쓰는 statsmodels GLM(freq_weights + cluster-robust SE)은
+     strata를 반영하지 않는 근사치이며, survey 패키지의 정식 복합표본
+     설계(svydesign: weight+strata+PSU)와 동일하지 않습니다.
+     최종 통계적 추론 및 README에 보고된 수치는 07_survey_analysis.R
+     (survey::svydesign + svyglm) 결과를 기준으로 합니다.
+
+  DATA_PATH는 이 파일 기준 repo-relative 경로(data/0325_hn_all(med).csv)라
+  별도 수정 없이 그대로 실행 가능합니다.
 
   모델 구조:
     Model 1: 성별, 연령
@@ -11,7 +19,7 @@
 
   차트 목록:
     [1] Model 3 전체 변수 Forest Plot
-    [2] 모델별 적합도 변화 + Model 3 운동 OR
+    [2] Model 3 운동 그룹 OR (AIC 비교는 아래 이유로 표시하지 않음)
     [3] 성별 층화 — 운동 그룹 OR 비교
 ══════════════════════════════════════════════════════════════
 """
@@ -22,13 +30,15 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import warnings
+from pathlib import Path
 warnings.filterwarnings('ignore')
 
 # ──────────────────────────────────────────────────────────────
 # ★ CONFIG ★
 # ──────────────────────────────────────────────────────────────
 
-DATA_PATH = "/content/drive/Shareddrives/세미1 4조 공유드라이브/DA/류주영/0325_hn_all(med).csv"
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "data" / "0325_hn_all(med).csv"
 
 # Colab: 'NanumGothic' / Windows: 'Malgun Gothic'
 plt.rcParams['font.family'] = 'NanumGothic'
@@ -67,10 +77,11 @@ print(f"데이터 로드 완료: {len(df):,}명")
 
 
 # ──────────────────────────────────────────────────────────────
-# 복합표본 로지스틱 회귀 함수
+# 가중 로지스틱 회귀 함수 (freq_weights + cluster-robust SE, strata 미반영)
+# — 정식 복합표본 설계 분석은 07_survey_analysis.R 참고
 # ──────────────────────────────────────────────────────────────
 
-def run_survey_logistic(data, x_vars):
+def run_weighted_logistic(data, x_vars):
     y = data['metabolic_syndrome']
     X = sm.add_constant(data[x_vars])
     model = sm.GLM(y, X,
@@ -124,15 +135,15 @@ x2 = ['male', 'age', 'smoke_past', 'smoke_current', 'drink_current']
 x3 = ['male', 'age', 'smoke_past', 'smoke_current', 'drink_current',
       'ex_1', 'ex_2', 'ex_3']
 
-res_m1, mod_m1 = run_survey_logistic(df, x1)
-res_m2, mod_m2 = run_survey_logistic(df, x2)
-res_m3, mod_m3 = run_survey_logistic(df, x3)
+res_m1, mod_m1 = run_weighted_logistic(df, x1)
+res_m2, mod_m2 = run_weighted_logistic(df, x2)
+res_m3, mod_m3 = run_weighted_logistic(df, x3)
 
 # 성별 층화 (성별 변수 제외)
 x_gender = ['age', 'smoke_past', 'smoke_current', 'drink_current',
             'ex_1', 'ex_2', 'ex_3']
-res_male, _ = run_survey_logistic(df[df['sex'] == 1].copy(), x_gender)
-res_female, _ = run_survey_logistic(df[df['sex'] == 2].copy(), x_gender)
+res_male, _ = run_weighted_logistic(df[df['sex'] == 1].copy(), x_gender)
+res_female, _ = run_weighted_logistic(df[df['sex'] == 2].copy(), x_gender)
 
 print("분석 완료! Forest Plot 생성 중...\n")
 
@@ -189,42 +200,15 @@ print("✅ [차트 1] 저장 완료: forest_plot_1_model3_exercise_last.png")
 
 
 # ══════════════════════════════════════════════════════════════
-# [차트 2] 모델별 변화 — 운동 추가 효과 시각화
+# [차트 2] Model 3의 운동 그룹 OR
+# (AIC 모델 적합도 비교는 제외 — freq_weights로 부풀려진 raw
+#  KNHANES 가중치를 쓰는 likelihood 기반 지표라 해석하지 않으며,
+#  "AIC 낮을수록 좋음"처럼 비교 가능한 것으로 보이는 표현을
+#  남기지 않기 위해 시각화 자체를 뺐다.)
 # ══════════════════════════════════════════════════════════════
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+fig, ax = plt.subplots(1, 1, figsize=(7, 5))
 
-# --- 좌측: 모델 적합도 변화 (AIC) ---
-# NOTE: Raw KNHANES survey weights used as freq_weights inflate
-# likelihood-based metrics; AIC is therefore not interpreted.
-ax = axes[0]
-model_names = ['Model 1\n(성별,연령)', 'Model 2\n(+흡연,음주)', 'Model 3\n(+운동)']
-aics = [mod_m1.aic, mod_m2.aic, mod_m3.aic]
-aic_colors = [BLUE, AMBER, TEAL]
-
-bars = ax.bar(model_names, aics, color=aic_colors, width=0.5, zorder=3, edgecolor='white')
-for bar, val in zip(bars, aics):
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 0.5,
-            f'AIC\n{val:,.0f}', ha='center', va='center', fontsize=9,
-            fontweight='bold', color='white')
-
-# AIC 감소량 표시
-for i in range(1, len(aics)):
-    diff = aics[i] - aics[i-1]
-    mid_y = (aics[i-1] + aics[i]) / 2
-    ax.annotate('', xy=(i, aics[i]), xytext=(i-1, aics[i-1]),
-                arrowprops=dict(arrowstyle='->', color='#333', lw=1.5))
-    ax.text(i - 0.5, mid_y, f'{diff:,.0f}', ha='center', fontsize=9,
-            fontweight='bold', color='#333',
-            bbox=dict(boxstyle='round,pad=0.2', facecolor='#FFF3CD', edgecolor='#FFD700'))
-
-ax.set_ylabel('AIC', fontsize=11)
-ax.set_title('모델 적합도 변화 (AIC 낮을수록 좋음)', fontsize=12, fontweight='bold', pad=10)
-ax.grid(axis='y', alpha=0.2, zorder=0)
-ax.spines[['top', 'right']].set_visible(False)
-
-# --- 우측: Model 3의 운동 그룹 OR ---
-ax = axes[1]
 ex_vars = ['ex_1', 'ex_2', 'ex_3']
 ex_names = ['복합\n(유산소+근력)', '근력운동만', '유산소운동만', '안 함\n(기준)']
 ex_colors_bar = [TEAL, TEAL_LIGHT, AMBER, GRAY]
@@ -265,7 +249,7 @@ ax.set_ylim(0, max(ex_ci_hi) + 0.3)
 ax.grid(axis='y', alpha=0.2, zorder=0)
 ax.spines[['top', 'right']].set_visible(False)
 
-plt.suptitle('운동 변수 투입 효과 — 모델 적합도 + OR (복합표본)',
+plt.suptitle('운동 변수 투입 효과 — Model 3 운동 그룹 OR (가중 로지스틱, 탐색용)',
              fontsize=14, fontweight='bold', y=1.02)
 plt.tight_layout()
 plt.savefig('forest_plot_2_exercise_last_effect.png', dpi=150, bbox_inches='tight', facecolor='white')
@@ -324,7 +308,7 @@ for idx, (ev, title, ec) in enumerate(zip(ex_vars, ex_titles, ex_colors)):
     ax.grid(axis='x', alpha=0.2)
     ax.spines[['top', 'right']].set_visible(False)
 
-fig.suptitle('성별 층화 Forest Plot — 완전보정, 복합표본 (기준: 운동 안 함)',
+fig.suptitle('성별 층화 Forest Plot — 완전보정, 가중 로지스틱 (기준: 운동 안 함)',
              fontsize=14, fontweight='bold', y=1.02)
 plt.tight_layout()
 plt.savefig('forest_plot_3_gender_stratified.png', dpi=150, bbox_inches='tight', facecolor='white')
@@ -337,6 +321,6 @@ print("\n" + "=" * 50)
 print("Forest Plot 전체 완료!")
 print("=" * 50)
 print("  forest_plot_1_model3_exercise_last.png  — 전체 변수 OR")
-print("  forest_plot_2_exercise_last_effect.png  — 모델 적합도 + 운동 OR")
+print("  forest_plot_2_exercise_last_effect.png  — Model 3 운동 그룹 OR")
 print("  forest_plot_3_gender_stratified.png     — 성별 층화 OR")
 print("=" * 50)

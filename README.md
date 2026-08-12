@@ -244,9 +244,11 @@ RandomForest 모델 (건강검진 수치는 사용하지 않음)
 
 ```
 .
-├── data/                          # 데이터 디렉토리 (gitignore 처리)
-│   ├── hn_all.csv                 # 원본 KNHANES 데이터 (직접 다운로드 필요)
-│   └── 0325_hn_all(med).csv       # 전처리 완료 데이터 (전처리 스크립트 실행 후 생성)
+├── data/                          # 데이터 디렉토리 (gitignore 처리, raw는 용량이 커서 레포에 미포함)
+│   ├── hn_all.csv                 # raw: 원본 KNHANES 데이터 (직접 다운로드 필요)
+│   ├── 0325_hn_all(med).csv       # processed: 01 실행 후 생성, 04/06이 직접 읽는 analytic dataset
+│   └── hn_all_full_merged.csv     # 07의 직접 입력 파일 — 원표본 전체의 strata/PSU/weight를
+│                                  #   유지한 복합표본 재분석용 데이터 (아래 7단계에서 만드는 방법 안내)
 │
 ├── 01_data_processing.py       # 데이터 전처리
 ├── 02_statistical_table.py     # 기술통계 및 검정통계표 생성
@@ -270,7 +272,7 @@ RandomForest 모델 (건강검진 수치는 사용하지 않음)
 ```bash
 pip install -r requirements.txt      # KNHANES 원본은 질병관리청에서 직접 다운로드 후 data/ 에 위치
 python 01_data_processing.py         # 전처리
-streamlit run 04_streamlit_app.py    # 웹 서비스 (metabolic_risk_model.joblib, feature_utils.py 필요)
+streamlit run 04_streamlit_app.py    # 웹 서비스 (data/0325_hn_all(med).csv, metabolic_risk_model.joblib, feature_utils.py 필요)
 python 06_model_refactor.py          # ML 재학습 (선택)
 Rscript 07_survey_analysis.R         # 복합표본 통계 재검증 (선택, R + survey 패키지 필요)
 ```
@@ -288,10 +290,10 @@ Rscript 07_survey_analysis.R         # 복합표본 통계 재검증 (선택, R 
 ⚠️ 파일 상단 `load_and_setup_data()`의 `base_path`/`ORIG_PATH`는 팀 공유 드라이브 경로이므로 본인 환경으로 수정 필요
 
 **4단계 — 웹 서비스 실행**: `streamlit run 04_streamlit_app.py`
-`metabolic_risk_model.joblib`(6단계 산출물)과 `feature_utils.py`가 같은 폴더에 있어야 함
+`data/0325_hn_all(med).csv`(1단계 산출물, 데이터 인사이트 페이지용), `metabolic_risk_model.joblib`(6단계 산출물), `feature_utils.py`가 모두 같은 폴더 구조에 있어야 함
 
 **5단계 — Forest Plot 생성 (선택)**: `python 05_forest_plot.py`
-⚠️ 파일 상단 `DATA_PATH`는 개인 Google Drive 경로이므로 `0325_hn_all(med).csv` 경로로 수정 필요
+`DATA_PATH`가 repo-relative(`data/0325_hn_all(med).csv`)라 별도 경로 수정 없이 실행됩니다.
 
 **6단계 — ML 파이프라인 재학습 (선택)**: `python 06_model_refactor.py`
 `data/0325_hn_all(med).csv`(3,363명 전체)를 새로 stratified 8:2 분할해 실행(팀의 기존 분할은 재사용하지 않음). 5개 후보 모델을 학습 데이터 CV로 비교 → 최종 모델 선정 → Isotonic 보정 → threshold 산출 → test set 평가까지 한 번에 수행하고 `metabolic_risk_model.joblib`을 저장.
